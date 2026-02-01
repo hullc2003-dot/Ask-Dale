@@ -1,6 +1,6 @@
 import os
 import random
-import requests
+import requests.        
 
 # --- API KEYS ---
 OPENAI_KEY = openai

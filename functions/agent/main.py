@@ -33,7 +33,7 @@ Follow all boundaries strictly.
 
 def write_memory(user_message, agent_response):
     supabase.table("memory_logs").insert({
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat()
         "user_message": user_message,
         "agent_response": agent_response
     }).execute()

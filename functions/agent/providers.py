@@ -8,9 +8,9 @@ GROQ_KEY = os.environ.get("GROQ_KEY")
 GEMINI_KEY = os.environ.get("GEMINI_KEY")
 
 # --- PROVIDER TOGGLES ---
-USE_OPENAI = os.environ.get("USE_OPENAI", "true").lower() == "true"
-USE_GROQ = os.environ.get("USE_GROQ", "true").lower() == "true"
-USE_GEMINI = os.environ.get("USE_GEMINI", "true").lower() == "true"
+USE_OPENAI = os.environ.get("USE_OPENAI", "true").lower() == "f"
+USE_GROQ = os.environ.get("USE_GROQ", "true").lower() == "f"
+USE_GEMINI = os.environ.get("USE_GEMINI", "true").lower() == "f"
 
 
 # --- PROVIDER CALLS ---

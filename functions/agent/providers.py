@@ -1,12 +1,11 @@
 import os
 import random
-import requests.        
+import requests        
 
 # --- API KEYS ---
-OPENAI_KEY = openai
-GROQ_KEY = grok
-GEMINI_KEY = os.environ.get("GEMINI_KEY")
-
+• OPENAI_KEY = secrets.get("openai_api_key")
+• GROQ_KEY = secrets.get("groq_api_key")
+• GEMINI_KEY = secrets.get("gemini_api_key")
 # --- PROVIDER TOGGLES ---
 USE_OPENAI = os.environ.get("USE_OPENAI", "true").lower() == "f"
 USE_GROQ = os.environ.get("USE_GROQ", "true").lower() == "f"

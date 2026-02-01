@@ -1,0 +1,6 @@
+supabase/
+  functions/
+    agent/
+      main.py
+      providers.py
+      requirements.txt

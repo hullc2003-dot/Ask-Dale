@@ -3,8 +3,8 @@ import random
 import requests
 
 # --- API KEYS ---
-OPENAI_KEY = os.environ.get("OPENAI_KEY")
-GROQ_KEY = os.environ.get("GROQ_KEY")
+OPENAI_KEY = openai
+GROQ_KEY = grok
 GEMINI_KEY = os.environ.get("GEMINI_KEY")
 
 # --- PROVIDER TOGGLES ---

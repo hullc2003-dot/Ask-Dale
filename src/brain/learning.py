@@ -52,4 +52,3 @@ class LearningLayer:
             "details": "No structural change required; maintain current configuration.",
             "source_reflection": reflection,
         }
-

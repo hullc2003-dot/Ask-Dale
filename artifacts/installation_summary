@@ -1,0 +1,46 @@
+PHASE 1 — Safety Layer
+1. Kill Switch
+2. Circuit Breaker
+3. Logging
+4. Usage Meter
+
+PHASE 2 — Routing Layer
+5. Intent Classifier
+6. Provider Router
+7. Provider Clients
+
+PHASE 3 — Persona Layer
+8. Persona Core
+9. Persona Skills
+10. Persona Boundaries
+11. Brain Loader
+12. System Prompt Builder
+
+PHASE 4 — Memory Layer
+13. Memory Policy
+14. Memory Store
+15. Interaction Logging
+
+PHASE 5 — Request Lifecycle
+16. handle_request()
+
+PHASE 6 — Learning Layer
+17. Log Collector
+18. Training Docs
+19. Thinking Prompt
+20. Nightly Job
+21. Proosal Generator
+22. Governance Filter
+23. Proposal Writer
+
+PHASE 7 — Brain Update Layer
+24. Proposal Review
+25. Brain Versioning
+26. Proposal Status Update
+
+PHASE 8 — Integration
+27. Fake DB Adapter
+28. Router Test
+29. Request Test
+30. Learning Test
+31. Approval Test

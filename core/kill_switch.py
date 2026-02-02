@@ -1,5 +1,9 @@
-# core/kill_switch.py
-def is_system_enabled(db) -> bool:
-    # db: handle/adapter, not raw client
-    row = db.get_flag("system_enabled")
-    return bool(row.value) if row else False
+class KillSwitch:
+    def __init__(self, db):
+        self.db = db
+
+    def is_enabled(self) -> bool:
+        flag = self.db.get_flag("system_enabled")
+        if flag is None:
+            return True
+        return bool(flag)

@@ -1,6 +1,6 @@
 import os
 
-SYSTEM_ENABLED_DEFAULT = True
+SYSTEM_ENABLED = False
 
 PROVIDER_THRESHOLDS = {
     "openai": {

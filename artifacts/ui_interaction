@@ -1,0 +1,25 @@
+GLOBAL_ENTRY_POINT
+[Start]
+   ↓
+Check Kill Switch (system_enabled)
+   ↓
+If OFF → Exit immediately
+   ↓
+Check Circuit Breaker (OPEN / HALF_OPEN / CLOSED)
+   ↓
+If OPEN → Exit with "system unavailable"
+[Incoming Request]
+   ↓
+Intent + Complexity Classification
+   ↓
+IF intent = simple (chitchat/faq/classification)
+      → Skip heavy persona layers
+      → Skip memory retrieval
+      → Route to cheap provider
+      → Generate response
+      → Log interaction
+      → Early exit if high confidence
+      → (Optional) enqueue learning sample
+      → Return response
+ELSE
+      → Continue

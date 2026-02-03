@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from brain.config import (
+from stc.brain.config import (
     BrainState,
     DeclarativeKnowledge,
     ProceduralReasoning,
@@ -10,7 +10,7 @@ from brain.config import (
     ProviderConfig,
     LearningConfig,
 )
-from brain.brain import Brain
+from src.brain.orchestrater import Brain
 
 
 def build_dev_brain() -> Brain:

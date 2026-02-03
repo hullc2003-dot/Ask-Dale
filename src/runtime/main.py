@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from stc.brain.config import (
+from src.brain.config import (
     BrainState,
     DeclarativeKnowledge,
     ProceduralReasoning,

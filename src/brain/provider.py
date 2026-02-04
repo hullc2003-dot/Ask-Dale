@@ -3,6 +3,10 @@ from .config import ProviderConfig
 
 
 class ProviderLayer:
+    self.use_openai = False
+    self.use_groq = False
+    self.use_gemini = False
+
     """
     Provider abstraction:
     - model selection

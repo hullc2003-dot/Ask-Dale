@@ -31,11 +31,15 @@ class GovernanceConfig:
     audit_logging: bool
 
 
-@dataclass
+@@dataclass
 class ProviderConfig:
     default_model: str
     provider_router_strategy: str
     fallback_models: List[str]
+
+    openai_key: str | None = None
+    groq_key: str | None = None
+    gemini_key: str | None = None
 
 
 @dataclass

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import List, Optional
 import random
+from .provider_usage import ProviderUsage
+
 
 class ProviderRouter:
     """
@@ -8,7 +10,7 @@ class ProviderRouter:
     - toggles
     - available keys
     - routing strategy
-    - usage-aware quota logic (up to Step 6)
+    - usage-aware quota logic
     """
 
     def __init__(
@@ -20,7 +22,8 @@ class ProviderRouter:
         groq_key: str | None,
         gemini_key: str | None,
         strategy: str = "random",
-        usage=None,  # usage object from provider_usage.py
+        usage: ProviderUsage | None = None,
+        debug: bool = False,
     ):
         self.use_openai = use_openai
         self.use_groq = use_groq
@@ -32,15 +35,16 @@ class ProviderRouter:
 
         self.strategy = strategy
         self.usage = usage
+        self.debug = debug
 
-    # --- QUOTA HELPERS (Step 6) ----------------------------------------
+    # --- QUOTA HELPERS -------------------------------------------------
 
     def openai_remaining(self) -> float:
         if not self.usage:
             return float("inf")
         return max(
             0.0,
-            self.usage.openai_monthly_quota - self.usage.openai_minutes_used
+            self.usage.openai_monthly_quota - self.usage.openai_minutes_used,
         )
 
     def groq_remaining(self) -> float:
@@ -48,7 +52,7 @@ class ProviderRouter:
             return float("inf")
         return max(
             0.0,
-            self.usage.groq_monthly_quota - self.usage.groq_minutes_used
+            self.usage.groq_monthly_quota - self.usage.groq_minutes_used,
         )
 
     def gemini_remaining(self) -> float:
@@ -56,37 +60,34 @@ class ProviderRouter:
             return float("inf")
         return max(
             0.0,
-            self.usage.gemini_monthly_quota - self.usage.gemini_minutes_used
+            self.usage.gemini_monthly_quota - self.usage.gemini_minutes_used,
         )
 
     # --- PROVIDER FILTERING --------------------------------------------
 
     def available_providers(self) -> List[str]:
-        providers = []
+        providers: List[str] = []
 
-        # OPENAI
-        if (
-            self.use_openai
-            and self.openai_key
-            and self.openai_remaining() > 0
-        ):
+        if self.use_openai and self.openai_key and self.openai_remaining() > 0:
             providers.append("openai")
 
-        # GROQ
-        if (
-            self.use_groq
-            and self.groq_key
-            and self.groq_remaining() > 0
-        ):
+        if self.use_groq and self.groq_key and self.groq_remaining() > 0:
             providers.append("groq")
 
-        # GEMINI
-        if (
-            self.use_gemini
-            and self.gemini_key
-            and self.gemini_remaining() > 0
-        ):
+        if self.use_gemini and self.gemini_key and self.gemini_remaining() > 0:
             providers.append("gemini")
+
+        if self.debug:
+            print(
+                "[router] available providers:",
+                providers,
+                "| remaining:",
+                {
+                    "openai": self.openai_remaining(),
+                    "groq": self.groq_remaining(),
+                    "gemini": self.gemini_remaining(),
+                },
+            )
 
         return providers
 
@@ -96,14 +97,19 @@ class ProviderRouter:
         providers = self.available_providers()
 
         if not providers:
+            if self.debug:
+                print("[router] no providers available, returning None")
             return None
 
         if self.strategy == "first":
-            return providers[0]
+            chosen = providers[0]
+        elif self.strategy == "round_robin":
+            # placeholder — stateful rotation can be added later
+            chosen = providers[0]
+        else:
+            chosen = random.choice(providers)
 
-        if self.strategy == "round_robin":
-            # placeholder — stateful rotation comes later
-            return providers[0]
+        if self.debug:
+            print(f"[router] strategy={self.strategy} chose provider={chosen}")
 
-        # default: random
-        return random.choice(providers)
+        return chosen

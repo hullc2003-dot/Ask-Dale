@@ -10,25 +10,28 @@ class ProviderRouter:
     - routing strategy
     """
 
-    def __init__(
-        self,
-        use_openai: bool,
-        use_groq: bool,
-        use_gemini: bool,
-        openai_key: Optional[str],
-        groq_key: Optional[str],
-        gemini_key: Optional[str],
-        strategy: str = "random"
-    ):
-        self.use_openai = use_openai
-        self.use_groq = use_groq
-        self.use_gemini = use_gemini
+   def __init__(
+    self,
+    use_openai: bool,
+    use_groq: bool,
+    use_gemini: bool,
+    openai_key: str | None,
+    groq_key: str | None,
+    gemini_key: str | None,
+    strategy: str = "random",
+    usage=None,  # ← NEW
+):
+    self.use_openai = use_openai
+    self.use_groq = use_groq
+    self.use_gemini = use_gemini
 
-        self.openai_key = openai_key
-        self.groq_key = groq_key
-        self.gemini_key = gemini_key
+    self.openai_key = openai_key
+    self.groq_key = groq_key
+    self.gemini_key = gemini_key
 
-        self.strategy = strategy
+    self.strategy = strategy
+    self.usage = usage  # ← NEW
+
 
     def available_providers(self) -> List[str]:
         providers = []

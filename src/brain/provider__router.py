@@ -8,7 +8,7 @@ class ProviderRouter:
     - toggles
     - available keys
     - routing strategy
-    - (later) usage-aware quota logic
+    - usage-aware quota logic (partial, up to Step 4)
     """
 
     def __init__(
@@ -43,5 +43,59 @@ class ProviderRouter:
     def groq_remaining(self) -> float:
         if not self.usage:
             return float("inf")
-        return
+        return max(0.0, self.usage.groq_minutes_used)
+
+    def gemini_remaining(self) -> float:
+        if not self.usage:
+            return float("inf")
+        return max(0.0, self.usage.gemini_minutes_used)
+
+    # --- PROVIDER FILTERING (Step 4) -----------------------------------
+
+    def available_providers(self) -> List[str]:
+        providers = []
+
+        # OPENAI
+        if (
+            self.use_openai
+            and self.openai_key
+            and self.openai_remaining() > 0
+        ):
+            providers.append("openai")
+
+        # GROQ
+        if (
+            self.use_groq
+            and self.groq_key
+            and self.groq_remaining() > 0
+        ):
+            providers.append("groq")
+
+        # GEMINI
+        if (
+            self.use_gemini
+            and self.gemini_key
+            and self.gemini_remaining() > 0
+        ):
+            providers.append("gemini")
+
+        return providers
+
+    # --- PROVIDER SELECTION --------------------------------------------
+
+    def choose(self) -> Optional[str]:
+        providers = self.available_providers()
+
+        if not providers:
+            return None
+
+        if self.strategy == "first":
+            return providers[0]
+
+        if self.strategy == "round_robin":
+            # placeholder — stateful rotation comes later
+            return providers[0]
+
+        # default: random
+        return random.choice(providers)
 

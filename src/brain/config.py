@@ -1,61 +1,34 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import List, Dict
 
 
 @dataclass
-class DeclarativeKnowledge:
-    personality: Dict[str, Any]
-    boundaries: Dict[str, Any]
-    rules: Dict[str, Any]
-
-
-@dataclass
-class ProceduralReasoning:
-    logic_map: Dict[str, Any]
-    strategies: Dict[str, Any]
-
-
-@dataclass
-class MemoryConfig:
-    rag_enabled: bool
-    embedding_provider: str
-    vector_store: str
-    retrieval_params: Dict[str, Any]
-
-
-@dataclass
-class GovernanceConfig:
-    safety_policies: Dict[str, Any]
-    kill_switches: Dict[str, Any]
-    audit_logging: bool
-
-
-@@dataclass
 class ProviderConfig:
-    default_model: str
-    provider_router_strategy: str
-    fallback_models: List[str]
+    # routing
+    provider_router_strategy: str = "random"  # "random" | "first" | "round_robin"
 
-    openai_key: str | None = None
-    groq_key: str | None = None
-    gemini_key: str | None = None
+    # models
+    default_model: str = "openai:gpt-4.1-mini"
+    fallback_models: List[str] = None
 
+    # cost + token → "minutes" mapping
+    # you can treat "minutes" as an abstract budget unit
+    cost_per_1k_tokens: Dict[str, float] = None  # keyed by provider
+    tokens_per_minute: float = 1000.0  # 1 "minute" = 1k tokens by default
 
-@dataclass
-class LearningConfig:
-    daily_learning_enabled: bool
-    reflection_prompts: List[str]
-    proposal_thresholds: Dict[str, Any]
+    debug_routing: bool = False  # if True, log why a provider was chosen
 
+    def __post_init__(self):
+        if self.fallback_models is None:
+            self.fallback_models = [
+                "groq:llama-3-70b",
+                "gemini:gemini-1.5-pro",
+            ]
 
-@dataclass
-class BrainState:
-    agent_id: str
-    version: str
-    declarative: DeclarativeKnowledge
-    procedural: ProceduralReasoning
-    memory: MemoryConfig
-    governance: GovernanceConfig
-    providers: ProviderConfig
-    learning: LearningConfig
+        if self.cost_per_1k_tokens is None:
+            self.cost_per_1k_tokens = {
+                "openai": 0.01,
+                "groq": 0.002,
+                "gemini": 0.005,
+            }

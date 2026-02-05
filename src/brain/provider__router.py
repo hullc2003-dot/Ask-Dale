@@ -30,7 +30,23 @@ class ProviderRouter:
     self.gemini_key = gemini_key
 
     self.strategy = strategy
-    self.usage = usage  # ← NEW
+    self.usage = usage  # ←     # --- QUOTA HELPERS -------------------------------------------------
+
+    def openai_remaining(self) -> float:
+        if not self.usage:
+            return float("inf")  # treat as unlimited if no usage object
+        return max(0.0, self.usage.openai_minutes_used)
+
+    def groq_remaining(self) -> float:
+        if not self.usage:
+            return float("inf")
+        return max(0.0, self.usage.groq_minutes_used)
+
+    def gemini_remaining(self) -> float:
+        if not self.usage:
+            return float("inf")
+        return max(0.0, self.usage.gemini_minutes_used)
+
 
 
     def available_providers(self) -> List[str]:

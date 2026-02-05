@@ -72,4 +72,8 @@ class ProviderLayer:
             provider = "gemini"
 
         # Increment usage if we recognized the provider
-       
+        if provider:
+            self._increment_usage(provider)
+
+        # Placeholder response
+        return f"{model} {prompt}"

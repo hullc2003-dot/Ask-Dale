@@ -57,15 +57,37 @@ class ProviderUsage:
             or (datetime.utcnow() + timedelta(days=30)).isoformat(),
         )
 
+    # --- STEP 7: AUTO RESET --------------------------------------------
+
+    def maybe_reset(self) -> None:
+        """Reset usage if the reset timestamp has passed."""
+        try:
+            reset_time = datetime.fromisoformat(self.reset_timestamp)
+        except Exception:
+            # if timestamp is corrupted, force reset
+            reset_time = datetime.utcnow() - timedelta(seconds=1)
+
+        if datetime.utcnow() >= reset_time:
+            # reset all usage
+            self.openai_minutes_used = 0.0
+            self.groq_minutes_used = 0.0
+            self.gemini_minutes_used = 0.0
+
+            # schedule next reset 30 days from now
+            self.reset_timestamp = (datetime.utcnow() + timedelta(days=30)).isoformat()
+
 
 def load_usage() -> ProviderUsage:
     if not os.path.exists(USAGE_FILE_PATH):
-        return ProviderUsage.default()
+        usage = ProviderUsage.default()
+        return usage
 
     try:
         with open(USAGE_FILE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return ProviderUsage.from_dict(data)
+        usage = ProviderUsage.from_dict(data)
+        usage.maybe_reset()  # <-- STEP 7.2
+        return usage
     except Exception:
         return ProviderUsage.default()
 

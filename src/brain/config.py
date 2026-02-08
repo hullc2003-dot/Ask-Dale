@@ -13,7 +13,6 @@ class ProviderConfig:
     fallback_models: List[str] = None
 
     # cost + token → "minutes" mapping
-    # you can treat "minutes" as an abstract budget unit
     cost_per_1k_tokens: Dict[str, float] = None  # keyed by provider
     tokens_per_minute: float = 1000.0  # 1 "minute" = 1k tokens by default
 
@@ -23,12 +22,12 @@ class ProviderConfig:
         if self.fallback_models is None:
             self.fallback_models = [
                 "groq:llama-3-70b",
-                "gemini:gemini-1.5-pro",
+                "openrouter:gpt-4.1-mini",
             ]
 
         if self.cost_per_1k_tokens is None:
             self.cost_per_1k_tokens = {
                 "openai": 0.01,
                 "groq": 0.002,
-                "gemini": 0.005,
+                "openrouter": 0.008,
             }

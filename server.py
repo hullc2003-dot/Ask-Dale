@@ -1,9 +1,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from src.runtime.main import build_dev_brain
+
+from src.brain.orchestrater import Brain
+from src.brain.config import ProviderConfig
 
 app = FastAPI()
-brain = build_dev_brain()
+
+# Build a simple brain using your current architecture
+provider_cfg = ProviderConfig()
+brain = Brain(provider_cfg)
 
 
 class ChatRequest(BaseModel):

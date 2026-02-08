@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+import os
 
 @dataclass
 class ProviderConfig:
@@ -17,14 +18,12 @@ class ProviderConfig:
     })
     tokens_per_minute: float = 1000.0
     debug_routing: bool = False
-    usage: Dict[str, Any] = field(default_factory=dict) # Added to prevent attribute errors
+    usage: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class GovernanceConfig:
     master_enabled: bool = True
     audit_logging: bool = True
-    # "global": False means the brain IS ALLOWED TO RUN.
-    # "global": True means the KILL SWITCH IS ENGAGED.
     kill_switches: Dict[str, bool] = field(default_factory=lambda: {
         "global": False
     })
@@ -70,6 +69,11 @@ class LearningConfig:
     proposal_thresholds: Dict[str, float] = field(default_factory=lambda: {
         "confidence": 0.8
     })
+
+    # --- REQUIRED FOR LEARNINGLAYER ---
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_SERVICE_ROLE: str = os.getenv("SUPABASE_SERVICE_ROLE", "")
 
 @dataclass
 class BrainState:

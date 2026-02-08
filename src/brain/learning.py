@@ -1,87 +1,106 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import Any, Dict, Optional, List
+import datetime
 import os
 
-@dataclass
-class ProviderConfig:
-    provider_router_strategy: str = "random"
-    default_model: str = "openai:gpt-4.1-mini"
-    fallback_models: List[str] = field(default_factory=lambda: [
-        "groq:llama-3-70b",
-        "openrouter:gpt-4.1-mini",
-    ])
-    cost_per_1k_tokens: Dict[str, float] = field(default_factory=lambda: {
-        "openai": 0.01,
-        "groq": 0.002,
-        "openrouter": 0.008,
-    })
-    tokens_per_minute: float = 1000.0
-    debug_routing: bool = False
-    usage: Dict[str, Any] = field(default_factory=dict)
+# --- Safe Supabase import (prevents module crash on Render) ---
+try:
+    from supabase import create_client, Client
+except Exception:
+    create_client = None
+    Client = None
+    print("WARNING: Supabase client unavailable — LearningLayer cannot initialize")
+# ----------------------------------------------------------------
 
-@dataclass
-class GovernanceConfig:
-    master_enabled: bool = True
-    audit_logging: bool = True
-    kill_switches: Dict[str, bool] = field(default_factory=lambda: {
-        "global": False
-    })
-    safety_policies: Dict[str, Any] = field(default_factory=lambda: {
-        "enabled": True,
-        "strict_mode": False
-    })
+from .config import LearningConfig
 
-@dataclass
-class MemoryConfig:
-    rag_enabled: bool = True
-    vector_db_path: str = "data/memory.db"
 
-@dataclass
-class DeclarativeKnowledge:
-    personality: Dict[str, str] = field(default_factory=lambda: {
-        "tone": "helpful",
-        "style": "concise"
-    })
-    rules: Dict[str, str] = field(default_factory=lambda: {
-        "primary": "Always be polite",
-        "secondary": "Verify facts"
-    })
-    boundaries: Dict[str, Any] = field(default_factory=lambda: {
-        "allow_harm": False,
-        "no_insults": True
-    })
+class LearningLayer:
+    """
+    Agentic Learning Layer:
+    Prioritizes base knowledge (MD files) over interaction-based learning.
+    """
 
-@dataclass
-class ProceduralReasoning:
-    strategies: Dict[str, str] = field(default_factory=lambda: {
-        "explanation": "chain_of_thought",
-        "planning": "step_by_step",
-        "default": "direct_answer"
-    })
+    def __init__(self, config: LearningConfig) -> None:
+        self.config = config
 
-@dataclass
-class LearningConfig:
-    daily_learning_enabled: bool = True
-    reflection_prompts: List[str] = field(default_factory=lambda: [
-        "What did we learn from this interaction?"
-    ])
-    proposal_thresholds: Dict[str, float] = field(default_factory=lambda: {
-        "confidence": 0.8
-    })
+        # --- FIXED: use correct config attribute names ---
+        # MUST use SERVICE_ROLE for inserts
+        if create_client is None:
+            raise RuntimeError("Supabase client unavailable — cannot initialize LearningLayer")
 
-    # ✅ ONLY CHANGE ADDED — Supabase fields
-    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
-    SUPABASE_SERVICE_ROLE: str = os.getenv("SUPABASE_SERVICE_ROLE", "")
+        self.supabase: Client = create_client(
+            config.SUPABASE_URL,
+            config.SUPABASE_SERVICE_ROLE
+        )
+        # -------------------------------------------------
 
-@dataclass
-class BrainState:
-    agent_id: str
-    version: str
-    governance: GovernanceConfig
-    memory: MemoryConfig
-    providers: ProviderConfig
-    procedural: ProceduralReasoning
-    learning: LearningConfig
-    declarative: DeclarativeKnowledge = field(default_factory=DeclarativeKnowledge)
+    def sync_base_knowledge(self):
+        """
+        Primary learning source. Reads MD files and updates Supabase.
+        Use this to 're-ground' the agent.
+        """
+        knowledge_files = {
+            "agent.md": "core_identity",
+            "learning_material.md": "domain_knowledge"
+        }
+        
+        for file_path, category in knowledge_files.items():
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    
+                self.supabase.table("agent_memory").insert({
+                    "content": content,
+                    "type": "base_knowledge",
+                    "metadata": {"category": category, "priority": "high"},
+                    "created_at": datetime.datetime.utcnow().isoformat()
+                }).execute()
+
+        print("✅ Base knowledge synced from MD files.")
+
+    def generate_reflection(
+        self,
+        user_input: str,
+        output: str,
+        timestamp: datetime.datetime,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Logs interactions, but marks them as 'secondary' weight.
+        """
+        if not self.config.daily_learning_enabled:
+            return None
+
+        reflection_text = f"Observed interaction: User asked '{user_input[:50]}...'"
+        
+        data = {
+            "timestamp": timestamp.isoformat(),
+            "content": reflection_text,
+            "type": "interaction_log",
+            "metadata": {"priority": "low"} 
+        }
+        
+        self.supabase.table("agent_memory").insert(data).execute()
+        return data
+
+    def propose_update(
+        self,
+        reflection: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generates suggestions for autonomy based ONLY on whether 
+        the interaction reveals a gap in the MD files.
+        """
+        if not reflection:
+            return None
+
+        proposal = {
+            "proposal_type": "autonomy_suggestion",
+            "details": "Update internal logic to map user requests more strictly to agent.md guidelines.",
+            "type": "suggestion",
+            "metadata": {"source": "interaction_gap"},
+            "created_at": datetime.datetime.utcnow().isoformat()
+        }
+
+        self.supabase.table("agent_memory").insert(proposal).execute()
+        return proposal

@@ -220,3 +220,13 @@ class LearningLayer:
 
     def run(self):
         return run_learning_cycle()
+
+    # --- Added: orchestrator-required method ---
+    def generate_reflection(self, user_input, output, timestamp):
+        cycle = run_learning_cycle()
+        return cycle.get("reflection")
+
+    # --- Added: orchestrator-required method ---
+    def propose_update(self, reflection):
+        cycle = run_learning_cycle()
+        return cycle.get("proposals")

@@ -12,11 +12,10 @@ from tenacity import (
 
 from .config import ProviderConfig
 from .provider_usage import save_usage, ProviderUsage
-from .provider_history import log_provider_call, make_record
-from .provider__router import ProviderRouter
+# Fixed potential typo in your import to match previous file name
+from .provider_router import ProviderRouter 
 
 logger = logging.getLogger("ProviderLayer")
-
 
 class ProviderLayer:
     def __init__(self, config: ProviderConfig, usage: ProviderUsage | None = None):
@@ -39,46 +38,43 @@ class ProviderLayer:
         )
 
     def select_model(self, intent: str) -> str:
-        """
-        Selects a model using the ProviderRouter.
-        Falls back to a safe default if routing fails.
-        """
         try:
             model = self.router.select_model(intent)
             if model:
                 return model
         except Exception as e:
             logger.warning(f"Router model selection failed: {e}")
-
-        # Fallback model if router returns nothing
         return "openai:gpt-4o"
 
     async def _http_post(self, url: str, headers: dict, body: dict) -> str:
         async with httpx.AsyncClient() as client:
+            # Added explicit error handling for common status codes
             resp = await client.post(url, headers=headers, json=body, timeout=30.0)
+            if resp.status_code == 429:
+                raise httpx.HTTPStatusError("Rate limit exceeded", request=resp.request, response=resp)
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"]
 
-    async def _call_openai(self, model: str, prompt: str) -> str:
+    async def _call_openai(self, prompt: str) -> str:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {self.openai_key}"}
         body = {
-            "model": model.split("openai:")[-1],
+            "model": "gpt-4o",
             "messages": [{"role": "user", "content": prompt}],
         }
         return await self._http_post(url, headers, body)
 
-    async def _call_groq(self, model: str, prompt: str) -> str:
+    async def _call_groq(self, prompt: str) -> str:
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {"Authorization": f"Bearer {self.groq_key}"}
         body = {
-            "model": model.split("groq:")[-1],
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
         }
         return await self._http_post(url, headers, body)
 
-    async def _call_openrouter(self, model: str, prompt: str) -> str:
+    async def _call_openrouter(self, prompt: str) -> str:
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.openrouter_key}",
@@ -86,7 +82,7 @@ class ProviderLayer:
             "X-Title": "AI Brain Agent",
         }
         body = {
-            "model": model.split("openrouter:")[-1],
+            "model": "xiaomi/mimo-v2-flash",
             "messages": [{"role": "user", "content": prompt}],
         }
         return await self._http_post(url, headers, body)
@@ -94,35 +90,41 @@ class ProviderLayer:
     @retry(
         wait=wait_random_exponential(min=1, max=5),
         stop=stop_after_attempt(2),
+        # Now catches 429 via HTTPStatusError if needed, but usually we want to fallback immediately
         retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
         reraise=True,
     )
-    async def _dispatch_call(self, provider: str, model: str, prompt: str) -> str:
+    async def _dispatch_call(self, provider: str, prompt: str) -> str:
         if provider == "openai":
-            return await self._call_openai(model, prompt)
+            return await self._call_openai(prompt)
         if provider == "groq":
-            return await self._call_groq(model, prompt)
+            return await self._call_groq(prompt)
         if provider == "openrouter":
-            return await self._call_openrouter(model, prompt)
+            return await self._call_openrouter(prompt)
         raise ValueError(f"Unknown provider: {provider}")
 
-    async def call_model(self, model: str, prompt: str) -> str:
+    async def call_model(self, model_tag: str, prompt: str) -> str:
+        """
+        Ignores the passed model_tag for fallback logic and uses 
+        the internal provider-specific model mapping.
+        """
         available_providers = self.router.available_providers()
         if not available_providers:
-            return "Error: All providers offline."
+            return "Error: All providers offline or out of quota."
 
         last_error = ""
         for provider in available_providers:
             try:
-                response = await self._dispatch_call(provider, model, prompt)
+                # Dispatch using the provider's native designated model
+                response = await self._dispatch_call(provider, prompt)
+                
+                # Usage Tracking
                 tokens = max(1, (len(prompt) + len(response)) // 4)
-                self._increment_usage(
-                    provider, tokens / self.config.tokens_per_minute
-                )
+                self._increment_usage(provider, tokens / self.config.tokens_per_minute)
                 return response
             except Exception as e:
                 last_error = str(e)
-                logger.warning(f"{provider} failed: {last_error}. Trying fallback...")
+                logger.warning(f"Provider '{provider}' failed: {last_error}. Trying fallback...")
                 continue
 
         return f"Service temporarily unavailable. (Last error: {last_error})"

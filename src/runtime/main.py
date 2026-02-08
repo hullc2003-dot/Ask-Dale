@@ -14,12 +14,14 @@ from src.brain.orchestrater import Brain
 
 
 def build_dev_brain() -> Brain:
+    # --- Declarative Knowledge (who the agent IS) ---
     declarative = DeclarativeKnowledge(
         personality={"tone": "warm", "style": "direct"},
         boundaries={"allow_harm": False, "no_insults": True},
         rules={"honesty": True, "respect_user": True},
     )
 
+    # --- Procedural Reasoning (how the agent THINKS) ---
     procedural = ProceduralReasoning(
         logic_map={"default": "single_turn"},
         strategies={
@@ -31,6 +33,7 @@ def build_dev_brain() -> Brain:
         },
     )
 
+    # --- Memory (RAG, embeddings, vector store) ---
     memory_cfg = MemoryConfig(
         rag_enabled=False,
         embedding_provider="none",
@@ -38,18 +41,24 @@ def build_dev_brain() -> Brain:
         retrieval_params={},
     )
 
+    # --- Governance (safety, audits, kill switches) ---
     governance_cfg = GovernanceConfig(
         safety_policies={"enabled": True},
         kill_switches={"global": False},
         audit_logging=True,
     )
 
+    # --- Providers (OpenAI, Groq, OpenRouter) ---
     provider_cfg = ProviderConfig(
-        default_model="dev-local-model",
-        provider_router_strategy="single",
-        fallback_models=[],
+        default_model="openai:gpt-4.1-mini",
+        provider_router_strategy="random",
+        fallback_models=[
+            "groq:llama-3-70b",
+            "openrouter:gpt-4.1-mini",
+        ],
     )
 
+    # --- Learning (daily reflection, self-improvement) ---
     learning_cfg = LearningConfig(
         daily_learning_enabled=True,
         reflection_prompts=[
@@ -58,9 +67,10 @@ def build_dev_brain() -> Brain:
         proposal_thresholds={"min_sessions": 10},
     )
 
+    # --- Brain State (the whole agent) ---
     state = BrainState(
         agent_id="agent_core_01",
-        version="v1.0.0-dev",
+        version="v1.0.0",
         declarative=declarative,
         procedural=procedural,
         memory=memory_cfg,

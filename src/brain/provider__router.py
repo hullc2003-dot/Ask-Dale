@@ -1,7 +1,10 @@
 from __future__ import annotations
 from typing import List, Optional
 import random
+import logging
 from .provider_usage import ProviderUsage
+
+logger = logging.getLogger(__name__)
 
 class ProviderRouter:
     def __init__(self, use_openai, use_groq, use_openrouter, openai_key, groq_key, openrouter_key, strategy="first", usage=None, debug=False):
@@ -32,6 +35,9 @@ class ProviderRouter:
         # Priority 2: Groq
         if self.use_groq and self.groq_key and self._get_remaining("groq") > 0:
             providers.append("groq")
+        # Priority 3: OpenRouter
+        if self.use_openrouter and self.openrouter_key and self._get_remaining("openrouter") > 0:
+            providers.append("openrouter")
         
         if self.debug:
             logger.info(f"Router available: {providers}")
@@ -46,7 +52,6 @@ class ProviderRouter:
             return random.choice(providers)
         return providers[0] # 'first' strategy
 
-    # ⭐ ADDED: Model selection including Groq Llama 3.3 70B Versatile + Xiaomi MiMo-V2-Flash
     def select_model(self, intent: str) -> str:
         """
         Returns a model string for the chosen provider.
@@ -59,11 +64,10 @@ class ProviderRouter:
             return "openai:gpt-4o"
 
         if provider == "groq":
-            # Real Groq model (correct ID)
             return "groq:llama-3.3-70b-versatile"
 
         if provider == "openrouter":
-            # ⭐ Added Xiaomi MiMo-V2-Flash here
-            return "openrouter:miro-xiaomi-mimo-v2-flash"
+            # Corrected to the official OpenRouter model ID for Xiaomi MiMo-V2-Flash
+            return "openrouter:xiaomi/mimo-v2-flash"
 
         return None

@@ -41,6 +41,23 @@ logger = logging.getLogger("RenderServer")
 
 app = FastAPI(title="AI Brain API")
 
+# --- CORS MIDDLEWARE ---
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/wake")
+async def wake():
+    import httpx
+    async with httpx.AsyncClient() as client:
+        r = await client.post("YOUR_RENDER_DEPLOY_HOOK")
+        return {"status": r.status_code}
+
 # 1. INITIALIZE FULL STATE
 state = BrainState(
     agent_id="prod_agent_001",

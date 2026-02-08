@@ -8,7 +8,7 @@ class GovernanceLayer:
         self.config = config
 
     def is_killed(self) -> bool:
-        return bool(self.config.kill_switches.get("global", False))
+    return not bool(self.config.kill_switches.get("global", False))
 
     def enforce_boundaries(
         self,

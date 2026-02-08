@@ -22,15 +22,15 @@ class ProviderConfig:
 class GovernanceConfig:
     master_enabled: bool = True
     audit_logging: bool = True
-    # Looked up by governance.is_killed()
+    # Change "global" to False to allow the brain to run
     kill_switches: Dict[str, bool] = field(default_factory=lambda: {
-        "global": True
+        "global": False
     })
-    # Looked up by governance.enforce_boundaries()
     safety_policies: Dict[str, Any] = field(default_factory=lambda: {
         "enabled": True,
         "strict_mode": False
     })
+
 
 @dataclass
 class MemoryConfig:

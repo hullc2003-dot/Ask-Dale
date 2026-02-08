@@ -36,6 +36,21 @@ class ProviderLayer:
             usage=self.usage,
             debug=self.config.debug_routing,
         )
+     def select_model(self, intent: str) -> str:
+        """
+        Selects a model using the ProviderRouter.
+        Falls back to a safe default if routing fails.
+        """
+        try:
+            model = self.router.select_model(intent)
+            if model:
+                return model
+        except Exception as e:
+            logger.warning(f"Router model selection failed: {e}")
+
+        # Fallback model if router returns nothing
+        return "openai:gpt-4o"
+
 
     async def _http_post(self, url: str, headers: dict, body: dict) -> str:
         async with httpx.AsyncClient() as client:

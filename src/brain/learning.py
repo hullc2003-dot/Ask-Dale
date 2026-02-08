@@ -209,3 +209,14 @@ def run_learning_cycle():
         "reflection": reflection,
         "proposals": proposals
     }
+
+
+# ---------------------------------------------------------
+# REQUIRED BY YOUR ORCHESTRATER
+# ---------------------------------------------------------
+class LearningLayer:
+    def __init__(self, config=None):
+        self.config = config
+
+    def run(self):
+        return run_learning_cycle()

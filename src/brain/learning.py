@@ -14,8 +14,8 @@ class LearningLayer:
     def __init__(self, config: LearningConfig) -> None:
         self.config = config
         self.supabase: Client = create_client(
-            config.supabase_url, 
-            config.supabase_key
+            config.SUPABASE_URL, 
+            config.SUPABASE_SERVICE_ROLE
         )
 
     def sync_base_knowledge(self):

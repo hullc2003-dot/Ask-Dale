@@ -36,6 +36,17 @@ class Brain:
     ) -> Dict[str, Any]:
         timestamp = datetime.datetime.utcnow()
 
+        # --- MASTER TOGGLE ---
+        if not self.state.governance.master_enabled:
+            return {
+                "agent_id": self.state.agent_id,
+                "brain_version": self.state.version,
+                "status": "disabled",
+                "reason": "Master toggle is OFF.",
+                "timestamp": timestamp.isoformat(),
+            }
+
+        # --- KILL SWITCH ---
         if use_governance and self.governance_layer.is_killed():
             return {
                 "agent_id": self.state.agent_id,
@@ -102,7 +113,11 @@ class Brain:
                 output=output,
                 timestamp=timestamp,
             )
-            proposal = self.learning_layer.propose_update(reflection) if reflection else None
+            proposal = (
+                self.learning_layer.propose_update(reflection)
+                if reflection
+                else None
+            )
 
         return {
             "agent_id": self.state.agent_id,

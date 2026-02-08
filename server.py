@@ -17,12 +17,32 @@ SRC_PATH = os.path.join(BASE_DIR, "src")
 if os.path.exists(SRC_PATH) and SRC_PATH not in sys.path:
     sys.path.append(SRC_PATH)
 
-# --- SUPABASE CONFIG FOR SERVER ---
+# --- DATABASE CONFIG ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-# Explicitly use the exposed schema
+# Target the specific brain schema
 opts = ClientOptions(schema="supabase_functions")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=opts)
+
+# --- CLOUD MASTER STARTUP SYNC ---
+def sync_agent_profile():
+    """
+    On startup, pulls the latest agent.md from Supabase.
+    This bypasses Render's ephemeral file system reset.
+    """
+    try:
+        # Query the system_files table for the current master content
+        res = supabase.table("system_files").select("content").eq("file_name", "agent.md").single().execute()
+        if res.data and res.data.get("content"):
+            with open("agent.md", "w", encoding="utf-8") as f:
+                f.write(res.data["content"])
+            print(">>> SUCCESS: agent.md synced from Supabase Cloud Master.")
+    except Exception as e:
+        # If the table doesn't exist yet or is empty, we continue with the GitHub default
+        print(f">>> NOTICE: Cloud Master sync skipped (using local default): {e}")
+
+# Trigger sync before the Brain or API initializes
+sync_agent_profile()
 
 # --- INTERNAL BRAIN IMPORTS ---
 try:
@@ -46,6 +66,7 @@ except ImportError as e:
     def get_rewrite_suggestions(): return {"suggestions": [], "count": 0}
     def apply_rewrites(): return "Error: rewrites.py failed to load"
 
+# --- INITIALIZE FASTAPI & LOGGING ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("RenderServer")
 
@@ -58,6 +79,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- INITIALIZE BRAIN STATE ---
 state = BrainState(
     agent_id="prod_agent_001",
     version="1.0.0",
@@ -69,6 +91,7 @@ state = BrainState(
     declarative=DeclarativeKnowledge()
 )
 
+# Load persistent usage data
 try:
     usage_data = load_usage()
     state.providers.usage = usage_data
@@ -78,14 +101,22 @@ except Exception as e:
 
 brain = Brain(state)
 
+# --- SCHEMAS ---
 class ChatRequest(BaseModel):
     input: str
     use_governance: bool = True
     use_memory: bool = True
 
+# --- ENDPOINTS ---
+
 @app.get("/")
 async def root():
-    return {"status": "online", "agent": "Dale", "version": state.version}
+    return {
+        "status": "online", 
+        "agent": "Dale", 
+        "version": state.version,
+        "sync_mode": "Cloud Master (Supabase)"
+    }
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
@@ -100,7 +131,11 @@ async def chat(req: ChatRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "online", "kill_switch_active": brain.governance.is_killed()}
+    return {
+        "status": "online", 
+        "kill_switch_active": brain.governance.is_killed(),
+        "agent_id": state.agent_id
+    }
 
 @app.post("/run-learning")
 async def run_learning_endpoint():

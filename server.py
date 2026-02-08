@@ -1,18 +1,24 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 import os
+import httpx
 
 # --- PATH CONFIGURATION ---
-# Ensures internal 'src' modules and local scripts are importable
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(BASE_DIR)
-if os.path.exists(os.path.join(BASE_DIR, "src")):
-    sys.path.append(os.path.join(BASE_DIR, "src"))
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
-# Internal Brain Imports
+# This handles the nested 'src' structure common on Render
+SRC_PATH = os.path.join(BASE_DIR, "src")
+if os.path.exists(SRC_PATH) and SRC_PATH not in sys.path:
+    sys.path.append(SRC_PATH)
+
+# --- INTERNAL BRAIN IMPORTS ---
 try:
+    # Use 'orchestrater' (matching your filename)
     from src.brain.orchestrater import Brain
     from src.brain.config import (
         BrainState, 
@@ -34,9 +40,9 @@ try:
     from src.brain.rewrites import get_rewrite_suggestions, apply_rewrites
 except ImportError as e:
     logging.warning(f"Local module import error (continuing with placeholders): {e}")
-    def run_learning_loop(): return "Error: learning.py not found"
-    def get_rewrite_suggestions(): return "Error: rewrites.py not found"
-    def apply_rewrites(): return "Error: rewrites.py not found"
+    def run_learning_loop(): return "Error: learning.py failed to load"
+    def get_rewrite_suggestions(): return {"suggestions": [], "count": 0}
+    def apply_rewrites(): return "Error: rewrites.py failed to load"
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -45,7 +51,6 @@ logger = logging.getLogger("RenderServer")
 app = FastAPI(title="AI Brain API")
 
 # --- CORS MIDDLEWARE ---
-from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -65,7 +70,7 @@ state = BrainState(
     declarative=DeclarativeKnowledge()
 )
 
-# Safe Injection of Usage Data
+# Load persistent usage data if available
 try:
     usage_data = load_usage()
     state.providers.usage = usage_data
@@ -83,9 +88,18 @@ class ChatRequest(BaseModel):
 
 # --- CORE ENDPOINTS ---
 
+@app.get("/")
+async def root():
+    """Endpoint to satisfy Render Health Check and provide basic status."""
+    return {
+        "status": "online",
+        "agent": "Dale",
+        "version": state.version,
+        "kill_switch": brain.governance.is_killed()
+    }
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
-    # Check Master Kill Switch BEFORE doing anything else
     if brain.governance.is_killed():
         return {
             "output": "System Offline: The global kill switch is currently engaged.",
@@ -99,7 +113,6 @@ async def chat(req: ChatRequest):
             use_memory=req.use_memory
         )
 
-        # Standard check for governance blocks
         if result.get("status") in ["blocked", "killed", "disabled"]:
             return {
                 "output": f"Request Denied: {result.get('reason')}",
@@ -114,28 +127,28 @@ async def chat(req: ChatRequest):
 
 @app.get("/health")
 async def health():
-    # Attempting to fetch remaining quota safely
+    # Dynamic quota checking
     try:
-        openai_rem = brain.provider_layer.router.openai_remaining()
-        groq_rem = brain.provider_layer.router.groq_remaining()
-    except AttributeError:
+        # Note: Added fallback for internal router methods
+        openai_rem = getattr(brain.provider_layer.router, 'openai_remaining', lambda: "N/A")()
+        groq_rem = getattr(brain.provider_layer.router, 'groq_remaining', lambda: "N/A")()
+    except Exception:
         openai_rem = groq_rem = "Unknown"
 
     return {
         "status": "online",
         "kill_switch_active": brain.governance.is_killed(),
         "agent_id": state.agent_id,
-        "quota_remaining": {
-            "openai": openai_rem,
-            "groq": groq_rem
+        "usage": {
+            "openai_remaining": openai_rem,
+            "groq_remaining": groq_rem
         }
     }
 
 @app.post("/wake")
 async def wake():
-    import httpx
-    # Note: Ensure this URL and Key are protected in environment variables
-    RENDER_URL = "https://api.render.com/deploy/srv-d641r4q4d50c73e371g0?key=jJRf3YqLDsA"
+    # Use environment variables for production security
+    RENDER_URL = os.getenv("RENDER_DEPLOY_HOOK", "https://api.render.com/deploy/srv-d641r4q4d50c73e371g0?key=jJRf3YqLDsA")
     async with httpx.AsyncClient() as client:
         try:
             r = await client.post(RENDER_URL)

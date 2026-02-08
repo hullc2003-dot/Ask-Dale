@@ -13,12 +13,12 @@ class ProviderUsage:
     # minutes used this month (abstract budget)
     openai_minutes_used: float
     groq_minutes_used: float
-    gemini_minutes_used: float
+    openrouter_minutes_used: float
 
     # monthly quotas (in "minutes")
     openai_monthly_quota: float
     groq_monthly_quota: float
-    gemini_monthly_quota: float
+    openrouter_monthly_quota: float
 
     # when usage resets
     reset_timestamp: str  # ISO string
@@ -29,10 +29,11 @@ class ProviderUsage:
         return cls(
             openai_minutes_used=0.0,
             groq_minutes_used=0.0,
-            gemini_minutes_used=0.0,
-            openai_monthly_quota=100.0,
-            groq_monthly_quota=100.0,
-            gemini_monthly_quota=100.0,
+            openrouter_minutes_used=0.0,
+            # set your real limits here
+            openai_monthly_quota=200.0,
+            groq_monthly_quota=500.0,
+            openrouter_monthly_quota=300.0,
             reset_timestamp=reset_time,
         )
 
@@ -44,10 +45,10 @@ class ProviderUsage:
         return cls(
             openai_minutes_used=data.get("openai_minutes_used", 0.0),
             groq_minutes_used=data.get("groq_minutes_used", 0.0),
-            gemini_minutes_used=data.get("gemini_minutes_used", 0.0),
-            openai_monthly_quota=data.get("openai_monthly_quota", 100.0),
-            groq_monthly_quota=data.get("groq_monthly_quota", 100.0),
-            gemini_monthly_quota=data.get("gemini_monthly_quota", 100.0),
+            openrouter_minutes_used=data.get("openrouter_minutes_used", 0.0),
+            openai_monthly_quota=data.get("openai_monthly_quota", 200.0),
+            groq_monthly_quota=data.get("groq_monthly_quota", 500.0),
+            openrouter_monthly_quota=data.get("openrouter_monthly_quota", 300.0),
             reset_timestamp=data.get("reset_timestamp")
             or (datetime.utcnow() + timedelta(days=30)).isoformat(),
         )
@@ -61,7 +62,7 @@ class ProviderUsage:
         if datetime.utcnow() >= reset_time:
             self.openai_minutes_used = 0.0
             self.groq_minutes_used = 0.0
-            self.gemini_minutes_used = 0.0
+            self.openrouter_minutes_used = 0.0
             self.reset_timestamp = (datetime.utcnow() + timedelta(days=30)).isoformat()
 
 

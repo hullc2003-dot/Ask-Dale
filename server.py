@@ -55,7 +55,7 @@ app.add_middleware(
 async def wake():
     import httpx
     async with httpx.AsyncClient() as client:
-        r = await client.post("YOUR_RENDER_DEPLOY_HOOK")
+        r = await client.post("https://api.render.com/deploy/srv-d641r4q4d50c73e371g0?key=jJRf3YqLDsA")
         return {"status": r.status_code}
 
 # 1. INITIALIZE FULL STATE

@@ -17,12 +17,14 @@ class ProviderConfig:
     })
     tokens_per_minute: float = 1000.0
     debug_routing: bool = False
+    usage: Dict[str, Any] = field(default_factory=dict) # Added to prevent attribute errors
 
 @dataclass
 class GovernanceConfig:
     master_enabled: bool = True
     audit_logging: bool = True
-    # Change "global" to False to allow the brain to run
+    # "global": False means the brain IS ALLOWED TO RUN.
+    # "global": True means the KILL SWITCH IS ENGAGED.
     kill_switches: Dict[str, bool] = field(default_factory=lambda: {
         "global": False
     })
@@ -31,7 +33,6 @@ class GovernanceConfig:
         "strict_mode": False
     })
 
-
 @dataclass
 class MemoryConfig:
     rag_enabled: bool = True
@@ -39,17 +40,14 @@ class MemoryConfig:
 
 @dataclass
 class DeclarativeKnowledge:
-    # Looked up by reasoning.build_prompt()
     personality: Dict[str, str] = field(default_factory=lambda: {
         "tone": "helpful",
         "style": "concise"
     })
-    # Looked up by reasoning.build_prompt()
     rules: Dict[str, str] = field(default_factory=lambda: {
         "primary": "Always be polite",
         "secondary": "Verify facts"
     })
-    # Looked up by governance.enforce_boundaries()
     boundaries: Dict[str, Any] = field(default_factory=lambda: {
         "allow_harm": False,
         "no_insults": True
@@ -57,7 +55,6 @@ class DeclarativeKnowledge:
 
 @dataclass
 class ProceduralReasoning:
-    # Looked up by reasoning.select_strategy()
     strategies: Dict[str, str] = field(default_factory=lambda: {
         "explanation": "chain_of_thought",
         "planning": "step_by_step",

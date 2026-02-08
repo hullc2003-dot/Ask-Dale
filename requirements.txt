@@ -6,3 +6,4 @@ groq
 supabase
 python-dotenv
 httpx
+tenacity>=8.3.0

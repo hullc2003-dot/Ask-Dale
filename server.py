@@ -30,9 +30,9 @@ except ImportError as e:
 
 # --- LOCAL MODULE IMPORTS ---
 try:
-    from learning import run_learning_loop
+    from src.brain.learning import run_learning_loop
     from rewrites import get_rewrite_suggestions, apply_rewrites
-except ImportError as e:
+    except ImportError as e:
     logging.warning(f"Local module import error (continuing with placeholders): {e}")
     def run_learning_loop(): return "Error: learning.py not found"
     def get_rewrite_suggestions(): return "Error: rewrites.py not found"

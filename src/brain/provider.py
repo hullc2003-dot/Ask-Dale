@@ -1,42 +1,43 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
+import os
+import json
+import httpx
+import logging
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_random_exponential,
+    retry_if_exception_type,
+)
+
 from .config import ProviderConfig
 from .provider_usage import save_usage, ProviderUsage
 from .provider_history import log_provider_call, make_record
 from .provider__router import ProviderRouter
-import os
-import requests
-import json
 
+logger = logging.getLogger("ProviderLayer")
 
 class ProviderLayer:
     """
-    Provider abstraction:
-    - model selection
-    - call boundary
-    - usage tracking
-    - history logging
+    Production-Grade Provider Layer.
+    Handles async execution, resilient retries, and quota-respecting calls.
     """
 
     def __init__(self, config: ProviderConfig, usage: ProviderUsage | None = None):
         self.config = config
         self.usage = usage
 
-        # provider toggles
-        self.use_openai = True
-        self.use_groq = True
-        self.use_openrouter = True
-
-        # environment keys
+        # Environment keys
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.groq_key = os.getenv("GROQ_API_KEY")
         self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
-        # router
+        # Router initialization
         self.router = ProviderRouter(
-            use_openai=self.use_openai,
-            use_groq=self.use_groq,
-            use_openrouter=self.use_openrouter,
+            use_openai=bool(self.openai_key),
+            use_groq=bool(self.groq_key),
+            use_openrouter=bool(self.openrouter_key),
             openai_key=self.openai_key,
             groq_key=self.groq_key,
             openrouter_key=self.openrouter_key,
@@ -48,151 +49,112 @@ class ProviderLayer:
     # --- INTERNAL HELPERS ----------------------------------------------
 
     def _estimate_tokens(self, prompt: str, response: str) -> int:
-        total_chars = len(prompt) + len(response)
-        return max(1, total_chars // 4)
+        return max(1, (len(prompt) + len(response)) // 4)
 
-    def _tokens_to_minutes(self, provider: str, tokens: int) -> float:
+    def _tokens_to_minutes(self, tokens: int) -> float:
         return tokens / self.config.tokens_per_minute
 
     def _increment_usage(self, provider: str, minutes: float) -> None:
         if not self.usage:
             return
+        
+        attr_map = {
+            "openai": "openai_minutes_used",
+            "groq": "groq_minutes_used",
+            "openrouter": "openrouter_minutes_used"
+        }
+        
+        if provider in attr_map:
+            current_val = getattr(self.usage, attr_map[provider])
+            setattr(self.usage, attr_map[provider], current_val + minutes)
+            save_usage(self.usage)
 
-        if provider == "openai":
-            self.usage.openai_minutes_used += minutes
-        elif provider == "groq":
-            self.usage.groq_minutes_used += minutes
-        elif provider == "openrouter":
-            self.usage.openrouter_minutes_used += minutes
+    # --- ASYNC PROVIDER CALLS ------------------------------------------
 
-        save_usage(self.usage)
+    async def _http_post(self, url: str, headers: dict, body: dict) -> str:
+        """Centralized async HTTP logic with timeout."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, headers=headers, json=body, timeout=60.0)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
 
-    def _provider_from_model(self, model: str) -> str | None:
-        m = model.lower()
-        if "openai" in m:
-            return "openai"
-        if "groq" in m:
-            return "groq"
-        if "openrouter" in m:
-            return "openrouter"
-        return None
-
-    # --- REAL CALLS ----------------------------------------------------
-
-    def _call_openai(self, model: str, prompt: str) -> str:
-        if not self.openai_key:
-            raise RuntimeError("OPENAI_API_KEY not set")
-
-        # minimal HTTP call example (you can swap to official SDK)
+    async def _call_openai(self, model: str, prompt: str) -> str:
         url = "https://api.openai.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openai_key}",
-            "Content-Type": "application/json",
-        }
-        body: dict[str, Any] = {
+        headers = {"Authorization": f"Bearer {self.openai_key}"}
+        body = {
             "model": model.split("openai:")[-1],
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
+            "messages": [{"role": "user", "content": prompt}]
         }
-        resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return await self._http_post(url, headers, body)
 
-    def _call_groq(self, model: str, prompt: str) -> str:
-        if not self.groq_key:
-            raise RuntimeError("GROQ_API_KEY not set")
-
+    async def _call_groq(self, model: str, prompt: str) -> str:
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.groq_key}",
-            "Content-Type": "application/json",
-        }
-        body: dict[str, Any] = {
+        headers = {"Authorization": f"Bearer {self.groq_key}"}
+        body = {
             "model": model.split("groq:")[-1],
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
+            "messages": [{"role": "user", "content": prompt}]
         }
-        resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return await self._http_post(url, headers, body)
 
-    def _call_openrouter(self, model: str, prompt: str) -> str:
-        if not self.openrouter_key:
-            raise RuntimeError("OPENROUTER_API_KEY not set")
-
+    async def _call_openrouter(self, model: str, prompt: str) -> str:
         url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "Content-Type": "application/json",
-        }
-        body: dict[str, Any] = {
+        headers = {"Authorization": f"Bearer {self.openrouter_key}"}
+        body = {
             "model": model.split("openrouter:")[-1],
-            "messages": [
-                {"role": "user", "content": prompt},
-            ],
+            "messages": [{"role": "user", "content": prompt}]
         }
-        resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return await self._http_post(url, headers, body)
 
-    def _dispatch_call(self, provider: str, model: str, prompt: str) -> str:
-        if provider == "openai":
-            return self._call_openai(model, prompt)
-        if provider == "groq":
-            return self._call_groq(model, prompt)
-        if provider == "openrouter":
-            return self._call_openrouter(model, prompt)
+    # --- RESILIENCE LOGIC ----------------------------------------------
+
+    @retry(
+        wait=wait_random_exponential(min=1, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError)),
+        reraise=True
+    )
+    async def _dispatch_call_with_retry(self, provider: str, model: str, prompt: str) -> str:
+        """Handles the actual call with exponential backoff for network/server errors."""
+        if provider == "openai": return await self._call_openai(model, prompt)
+        if provider == "groq": return await self._call_groq(model, prompt)
+        if provider == "openrouter": return await self._call_openrouter(model, prompt)
         raise ValueError(f"Unknown provider: {provider}")
 
     # --- PUBLIC API ----------------------------------------------------
 
     def select_model(self, intent: str) -> str:
-        strategy = self.config.provider_router_strategy
-
-        if strategy == "single":
-            return self.config.default_model
-
-        if strategy == "fallback":
-            if "heavy" in intent.lower():
-                return self.config.fallback_models[0]
-            return self.config.default_model
-
-        # if using router, we still return a model string;
-        # you can later make this more dynamic per provider
+        if self.config.provider_router_strategy == "fallback" and "heavy" in intent.lower():
+            return self.config.fallback_models[0]
         return self.config.default_model
 
-    def call_model(self, model: str, prompt: str) -> str:
-        # choose provider based on router (quota + keys + toggles)
+    async def call_model(self, model: str, prompt: str) -> str:
+        """
+        The production entry point. 
+        Protects quotas and handles failures gracefully.
+        """
         provider = self.router.choose()
-        if provider is None:
-            # fallback: infer from model string
-            provider = self._provider_from_model(model)
-            if provider is None:
-                return f"{model} {prompt}"
+        if not provider:
+            logger.error("No available providers (Quota full or keys missing)")
+            return "Error: Quota exceeded or no providers available."
 
         success = True
         error_msg = None
         response = ""
 
         try:
-            response = self._dispatch_call(provider, model, prompt)
+            response = await self._dispatch_call_with_retry(provider, model, prompt)
         except Exception as e:
             success = False
             error_msg = str(e)
-            response = ""
+            logger.error(f"Failed to call {provider} after retries: {error_msg}")
 
+        # Usage Tracking
         tokens = self._estimate_tokens(prompt, response)
-        minutes = self._tokens_to_minutes(provider, tokens)
-
-        # update usage
+        minutes = self._tokens_to_minutes(tokens)
         self._increment_usage(provider, minutes)
 
-        # log history
+        # Logging
         record = make_record(
             provider=provider,
             model=model,
@@ -204,4 +166,4 @@ class ProviderLayer:
         )
         log_provider_call(record)
 
-        return response
+        return response if success else f"Service temporarily unavailable. ({error_msg})"

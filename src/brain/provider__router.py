@@ -17,21 +17,21 @@ class ProviderRouter:
         self,
         use_openai: bool,
         use_groq: bool,
-        use_gemini: bool,
+        use_openrouter: bool,
         openai_key: str | None,
         groq_key: str | None,
-        gemini_key: str | None,
+        openrouter_key: str | None,
         strategy: str = "random",
         usage: ProviderUsage | None = None,
         debug: bool = False,
     ):
         self.use_openai = use_openai
         self.use_groq = use_groq
-        self.use_gemini = use_gemini
+        self.use_openrouter = use_openrouter
 
         self.openai_key = openai_key
         self.groq_key = groq_key
-        self.gemini_key = gemini_key
+        self.openrouter_key = openrouter_key
 
         self.strategy = strategy
         self.usage = usage
@@ -55,12 +55,12 @@ class ProviderRouter:
             self.usage.groq_monthly_quota - self.usage.groq_minutes_used,
         )
 
-    def gemini_remaining(self) -> float:
+    def openrouter_remaining(self) -> float:
         if not self.usage:
             return float("inf")
         return max(
             0.0,
-            self.usage.gemini_monthly_quota - self.usage.gemini_minutes_used,
+            self.usage.openrouter_monthly_quota - self.usage.openrouter_minutes_used,
         )
 
     # --- PROVIDER FILTERING --------------------------------------------
@@ -74,8 +74,8 @@ class ProviderRouter:
         if self.use_groq and self.groq_key and self.groq_remaining() > 0:
             providers.append("groq")
 
-        if self.use_gemini and self.gemini_key and self.gemini_remaining() > 0:
-            providers.append("gemini")
+        if self.use_openrouter and self.openrouter_key and self.openrouter_remaining() > 0:
+            providers.append("openrouter")
 
         if self.debug:
             print(
@@ -85,7 +85,7 @@ class ProviderRouter:
                 {
                     "openai": self.openai_remaining(),
                     "groq": self.groq_remaining(),
-                    "gemini": self.gemini_remaining(),
+                    "openrouter": self.openrouter_remaining(),
                 },
             )
 

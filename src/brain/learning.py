@@ -1,215 +1,211 @@
-from __future__ import annotations
-from typing import Any, Dict, Optional, List
-import datetime
 import os
+import json
+import uuid
+from datetime import datetime
+from typing import List, Dict, Any
+from supabase import create_client, Client
 
-# --- Safe Supabase import ---
-try:
-    from supabase import create_client, Client
-except Exception:
-    create_client = None
-    Client = None
-    print("WARNING: Supabase client unavailable — LearningLayer cannot initialize")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-from .config import LearningConfig
-
-
-class LearningLayer:
-    """
-    Agentic Learning Layer:
-    Prioritizes base knowledge (MD files) over interaction-based learning.
-    """
-
-    def __init__(self, config: LearningConfig) -> None:
-        self.config = config
-
-        if create_client is None:
-            raise RuntimeError("Supabase client unavailable — cannot initialize LearningLayer")
-
-        # --- Correct Supabase credentials ---
-        self.supabase: Client = create_client(
-            config.SUPABASE_URL,
-            config.SUPABASE_SERVICE_ROLE
-        )
-
-    def sync_base_knowledge(self):
-        """
-        Primary learning source. Reads MD files and updates Supabase.
-        Use this to 're-ground' the agent.
-        """
-        knowledge_files = {
-            "agent.md": "core_identity",
-            "learning_material.md": "domain_knowledge"
-        }
-        
-        for file_path, category in knowledge_files.items():
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    
-                self.supabase.table("agent_memory").insert({
-                    "content": content,
-                    "type": "base_knowledge",
-                    "metadata": {"category": category, "priority": "high"},
-                    "created_at": datetime.datetime.utcnow().isoformat()
-                }).execute()
-
-        print("✅ Base knowledge synced from MD files.")
-
-    def generate_reflection(
-        self,
-        user_input: str,
-        output: str,
-        timestamp: datetime.datetime,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Logs interactions, but marks them as 'secondary' weight.
-        """
-        if not self.config.daily_learning_enabled:
-            return None
-
-        reflection_text = f"Observed interaction: User asked '{user_input[:50]}...'"
-        
-        data = {
-            "timestamp": timestamp.isoformat(),
-            "content": reflection_text,
-            "type": "interaction_log",
-            "metadata": {"priority": "low"} 
-        }
-        
-        self.supabase.table("agent_memory").insert(data).execute()
-        return data
-
-    def propose_update(
-        self,
-        reflection: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Generates suggestions for autonomy based ONLY on whether 
-        the interaction reveals a gap in the MD files.
-        """
-        if not reflection:
-            return None
-
-        proposal = {
-            "proposal_type": "autonomy_suggestion",
-            "details": "Update internal logic to map user requests more strictly to agent.md guidelines.",
-            "type": "suggestion",
-            "metadata": {"source": "interaction_gap"},
-            "created_at": datetime.datetime.utcnow().isoformat()
-        }
-
-        self.supabase.table("agent_memory").insert(proposal).execute()
-        return proposal
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-# ------------------------------------------------------------
-# Helper: Row-count verifier
-# ------------------------------------------------------------
-
-def verify_supabase_rows(layer: LearningLayer, since_timestamp: str) -> int:
-    """
-    Counts how many agent_memory rows were created after the loop started.
-    """
-    result = layer.supabase.table("agent_memory") \
-        .select("id") \
-        .gte("created_at", since_timestamp) \
-        .execute()
-
-    return len(result.data or [])
+# ---------------------------------------------------------
+# Utility: Read file safely
+# ---------------------------------------------------------
+def read_file(path: str) -> str:
+    if not os.path.exists(path):
+        return ""
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
-# ------------------------------------------------------------
-# FULL LEARNING LOOP (only this block changed)
-# ------------------------------------------------------------
+# ---------------------------------------------------------
+# Helper: Robust markdown section extraction
+# ---------------------------------------------------------
+def extract_section(text: str, header: str) -> str:
+    lines = text.splitlines()
+    capture = False
+    collected = []
 
-def run_learning_loop() -> Dict[str, Any]:
-    """
-    Full learning cycle:
-    1. Sync base knowledge from MD files
-    2. Generate a reflection log
-    3. Propose an update based on the reflection
-    4. Return a structured summary with success/failure flags
-    """
+    header_lower = header.lower()
 
-    timestamp = datetime.datetime.utcnow()
+    for line in lines:
+        stripped = line.strip()
+        if stripped.lstrip("#").strip().lower() == header_lower:
+            capture = True
+            continue
+        if capture and stripped.startswith("#"):
+            break
+        if capture:
+            collected.append(line)
 
-    # Initialize config + layer
-    config = LearningConfig()
-    layer = LearningLayer(config)
+    return "\n".join(collected).strip()
 
-    # ------------------------------------------------------------
-    # LOOP SUMMARY + FAILURE DETECTOR
-    # ------------------------------------------------------------
-    summary = {
-        "md_sync": {"success": False, "error": None},
-        "reflection": {"success": False, "error": None},
-        "proposal": {"success": False, "error": None},
-        "overall_status": "incomplete",
-        "timestamp": timestamp.isoformat()
+
+# ---------------------------------------------------------
+# Step 1A — Key takeaways
+# ---------------------------------------------------------
+def summarize_key_takeaways(agent_text: str, learning_text: str) -> Dict[str, Any]:
+    return {
+        "identity": extract_section(agent_text, "Identity"),
+        "purpose": extract_section(agent_text, "Purpose"),
+        "core_principles": extract_section(agent_text, "Core Principles"),
+        "learning_rules": extract_section(agent_text, "Learning Rules"),
+        "self_repair": extract_section(agent_text, "Self-Repair Rules"),
+        "self_improvement": extract_section(agent_text, "Self-Improvement Rules"),
+        "error_handling": extract_section(agent_text, "Error Handling"),
+        "reasoning_engine": extract_section(agent_text, "Reasoning Engine Rules"),
+        "personality_engine": extract_section(agent_text, "Personality Engine"),
+        "autonomy_boundaries": extract_section(agent_text, "Autonomy Boundaries"),
+        "learning_material_sample": learning_text[:1500],
     }
 
-    # ------------------------------------------------------------
-    # 1. Sync MD files
-    # ------------------------------------------------------------
+
+# ---------------------------------------------------------
+# Step 1B — Drift detection (not raw contradictions)
+# ---------------------------------------------------------
+def detect_drift(agent_text: str, memory_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    drift = []
+
+    for row in memory_rows:
+        payload = row.get("content")
+        if not payload:
+            continue
+
+        try:
+            parsed = json.loads(payload)
+        except Exception:
+            continue
+
+        if parsed.get("takeaways") and parsed["takeaways"] != {}:
+            if parsed["takeaways"] != agent_text:
+                drift.append({
+                    "memory_id": row.get("id"),
+                    "type": "identity_drift",
+                    "severity": "medium"
+                })
+
+    return drift
+
+
+# ---------------------------------------------------------
+# Step 1C — Gap detection
+# ---------------------------------------------------------
+def detect_gaps(agent_text: str, learning_text: str) -> List[str]:
+    gaps = []
+
+    required_sections = [
+        "Identity", "Purpose", "Core Principles", "Learning Rules",
+        "Self-Repair Rules", "Self-Improvement Rules", "Error Handling",
+        "Reasoning Engine Rules", "Personality Engine", "Autonomy Boundaries"
+    ]
+
+    for section in required_sections:
+        if not extract_section(agent_text, section):
+            gaps.append(f"Missing or empty section: {section}")
+
+    if len(learning_text.strip()) < 500:
+        gaps.append("Learning material is too shallow or empty.")
+
+    return gaps
+
+
+# ---------------------------------------------------------
+# Step 2 — Reflection
+# ---------------------------------------------------------
+def generate_reflection(cycle_id, takeaways, drift, gaps) -> str:
+    return json.dumps({
+        "cycle_id": cycle_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "observations": takeaways,
+        "drift_detected": drift,
+        "gaps_detected": gaps,
+        "recommended_actions": [
+            "Review drift items manually",
+            "Fill missing identity sections",
+            "Expand learning material depth"
+        ]
+    }, indent=2)
+
+
+# ---------------------------------------------------------
+# Step 3 — Proposal generation
+# ---------------------------------------------------------
+def generate_proposals(cycle_id, drift, gaps) -> List[Dict[str, Any]]:
+    proposals = []
+
+    for d in drift:
+        proposals.append({
+            "cycle_id": cycle_id,
+            "type": "review_drift",
+            "description": f"Potential identity drift detected from memory {d['memory_id']}",
+            "priority": d["severity"]
+        })
+
+    for g in gaps:
+        proposals.append({
+            "cycle_id": cycle_id,
+            "type": "fill_gap",
+            "description": g,
+            "priority": "medium"
+        })
+
+    return proposals
+
+
+# ---------------------------------------------------------
+# Step 4 — Persistence (fail soft)
+# ---------------------------------------------------------
+def safe_insert(table: str, payload: Dict[str, Any]):
     try:
-        layer.sync_base_knowledge()
-        summary["md_sync"]["success"] = True
+        supabase.table(table).insert(payload).execute()
     except Exception as e:
-        summary["md_sync"]["error"] = str(e)
+        print(f"[WARN] Failed to write to {table}: {e}")
 
-    # ------------------------------------------------------------
-    # 2. Generate reflection
-    # ------------------------------------------------------------
-    reflection = None
-    try:
-        reflection = layer.generate_reflection(
-            user_input="System-triggered learning cycle",
-            output="No output — automated learning run",
-            timestamp=timestamp
-        )
-        summary["reflection"]["success"] = True
-    except Exception as e:
-        summary["reflection"]["error"] = str(e)
 
-    # ------------------------------------------------------------
-    # 3. Propose update
-    # ------------------------------------------------------------
-    proposal = None
-    try:
-        proposal = layer.propose_update(reflection)
-        summary["proposal"]["success"] = True
-    except Exception as e:
-        summary["proposal"]["error"] = str(e)
+# ---------------------------------------------------------
+# Main learning cycle
+# ---------------------------------------------------------
+def run_learning_cycle():
+    cycle_id = str(uuid.uuid4())
 
-    # ------------------------------------------------------------
-    # 4. Row-count verification
-    # ------------------------------------------------------------
-    try:
-        rows_written = verify_supabase_rows(layer, timestamp.isoformat())
-        summary["rows_written"] = rows_written
-    except Exception as e:
-        summary["rows_written"] = 0
-        summary["row_verifier_error"] = str(e)
+    agent_text = read_file("agent.md")
+    learning_text = read_file("learning_material.md")
 
-    # ------------------------------------------------------------
-    # 5. Final status
-    # ------------------------------------------------------------
-    if (
-        summary["md_sync"]["success"]
-        and summary["reflection"]["success"]
-        and summary["proposal"]["success"]
-    ):
-        summary["overall_status"] = "success"
-    else:
-        summary["overall_status"] = "partial_failure"
+    memory_rows = supabase.table("agent_memory").select("*").execute().data or []
 
-    # ------------------------------------------------------------
-    # 6. Return structured result
-    # ------------------------------------------------------------
+    takeaways = summarize_key_takeaways(agent_text, learning_text)
+    drift = detect_drift(agent_text, memory_rows)
+    gaps = detect_gaps(agent_text, learning_text)
+
+    reflection = generate_reflection(cycle_id, takeaways, drift, gaps)
+    proposals = generate_proposals(cycle_id, drift, gaps)
+
+    safe_insert("agent_memory", {
+        "cycle_id": cycle_id,
+        "content": json.dumps({
+            "takeaways": takeaways,
+            "drift": drift,
+            "gaps": gaps
+        }),
+        "metadata": {"type": "learning_cycle"},
+        "created_at": datetime.utcnow().isoformat()
+    })
+
+    for p in proposals:
+        safe_insert("brain_proposals", {
+            "cycle_id": cycle_id,
+            "content": p["description"],
+            "proposal_type": p["type"],
+            "status": "pending",
+            "metadata": {"priority": p["priority"]},
+            "created_at": datetime.utcnow().isoformat()
+        })
+
     return {
-        "status": "learning_completed",
-        "summary": summary,
+        "cycle_id": cycle_id,
         "reflection": reflection,
-        "proposal": proposal
+        "proposals": proposals
     }

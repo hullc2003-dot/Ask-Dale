@@ -1,8 +1,16 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import logging
+import sys
+import os
 
-# Updated imports to match the full architecture
+# --- PATH CONFIGURATION ---
+# This ensures that 'learning.py' and 'rewrites.py' can be found 
+# regardless of whether they are in the root or the /src directory.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+if os.path.exists(os.path.join(os.getcwd(), "src")):
+    sys.path.append(os.path.join(os.getcwd(), "src"))
+
 from src.brain.orchestrater import Brain
 from src.brain.config import (
     BrainState, 
@@ -15,9 +23,17 @@ from src.brain.config import (
 )
 from src.brain.provider_usage import load_usage
 
-# Import your learning + rewrite logic
-from learning import run_learning_loop
-from rewrites import get_rewrite_suggestions, apply_rewrites
+# --- LOCAL MODULE IMPORTS ---
+try:
+    # Attempt to import from the root or paths added above
+    from learning import run_learning_loop
+    from rewrites import get_rewrite_suggestions, apply_rewrites
+except ImportError as e:
+    logging.error(f"Critical Import Error: {e}")
+    # Define fallback functions so the server doesn't crash on startup
+    def run_learning_loop(): return "Error: learning.py not found"
+    def get_rewrite_suggestions(): return "Error: rewrites.py not found"
+    def apply_rewrites(): return "Error: rewrites.py not found"
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +63,8 @@ class ChatRequest(BaseModel):
     input: str
     use_governance: bool = True
     use_memory: bool = True
+
+# --- CORE ENDPOINTS ---
 
 @app.post("/chat")
 async def chat(req: ChatRequest):
@@ -87,12 +105,10 @@ async def health():
         }
     }
 
-# ---------------------------------------------------
-# ⭐ ADD YOUR SIDEBAR COMMAND ENDPOINTS HERE
-# ---------------------------------------------------
+# --- SIDEBAR COMMAND ENDPOINTS ---
 
 @app.post("/run-learning")
-async def run_learning():
+async def run_learning_endpoint():
     try:
         result = run_learning_loop()
         return {"output": result}
@@ -101,7 +117,7 @@ async def run_learning():
         raise HTTPException(status_code=500, detail="Learning loop failed")
 
 @app.get("/rewrite-suggestions")
-async def rewrite_suggestions():
+async def rewrite_suggestions_endpoint():
     try:
         suggestions = get_rewrite_suggestions()
         return {"output": suggestions}
@@ -110,7 +126,7 @@ async def rewrite_suggestions():
         raise HTTPException(status_code=500, detail="Failed to fetch rewrite suggestions")
 
 @app.post("/perform-rewrites")
-async def perform_rewrites():
+async def perform_rewrites_endpoint():
     try:
         result = apply_rewrites()
         return {"output": result}

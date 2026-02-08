@@ -8,7 +8,9 @@ class GovernanceLayer:
         self.config = config
 
     def is_killed(self) -> bool:
-    return not bool(self.config.kill_switches.get("global", False))
+        # Master toggle: True = brain ON, False = brain OFF
+        # is_killed() returns True when the brain should STOP
+        return not bool(self.config.kill_switches.get("global", True))
 
     def enforce_boundaries(
         self,

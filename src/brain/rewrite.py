@@ -40,6 +40,9 @@ def get_rewrite_suggestions():
             suggestions.append(f"Consider integrating memory insight: {content[:200]}...")
 
     return {
-        "suggestions": suggestions,
-        "count": len(suggestions)
-    }
+    "rewrite": suggestions,
+    "suggestions": suggestions,
+    "count": len(suggestions)
+}
+
+    

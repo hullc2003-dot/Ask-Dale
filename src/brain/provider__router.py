@@ -45,3 +45,24 @@ class ProviderRouter:
         if self.strategy == "random":
             return random.choice(providers)
         return providers[0] # 'first' strategy
+
+    # ⭐ ADDED: Model selection including Groq Llama 3.3 70B Versatile
+    def select_model(self, intent: str) -> str:
+        """
+        Returns a model string for the chosen provider.
+        """
+        provider = self.choose()
+        if not provider:
+            return None
+
+        if provider == "openai":
+            return "openai:gpt-4o"
+
+        if provider == "groq":
+            # Real Groq model (correct ID)
+            return "groq:llama-3.3-70b-versatile"
+
+        if provider == "openrouter":
+            return "openrouter:gpt-4o"
+
+        return None

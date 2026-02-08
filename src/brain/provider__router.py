@@ -46,7 +46,7 @@ class ProviderRouter:
             return random.choice(providers)
         return providers[0] # 'first' strategy
 
-    # ⭐ ADDED: Model selection including Groq Llama 3.3 70B Versatile
+    # ⭐ ADDED: Model selection including Groq Llama 3.3 70B Versatile + Xiaomi MiMo-V2-Flash
     def select_model(self, intent: str) -> str:
         """
         Returns a model string for the chosen provider.
@@ -63,6 +63,7 @@ class ProviderRouter:
             return "groq:llama-3.3-70b-versatile"
 
         if provider == "openrouter":
-            return "openrouter:gpt-4o"
+            # ⭐ Added Xiaomi MiMo-V2-Flash here
+            return "openrouter:miro-xiaomi-mimo-v2-flash"
 
         return None

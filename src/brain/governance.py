@@ -21,7 +21,7 @@ class GovernanceLayer:
 
     def is_killed(self) -> bool:
         """Master toggle: Returns True if the brain should stop immediately."""
-        return not bool(self.config.kill_switches.get("global", True))
+        return not bool(self.config.kill_switches.get("global", False))
 
     def _detect_prompt_injection(self, user_input: str) -> bool:
         """Checks for common strings used to bypass AI safety settings."""

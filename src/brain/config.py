@@ -1,33 +1,86 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import List, Dict
-
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
 @dataclass
 class ProviderConfig:
-    # routing
-    provider_router_strategy: str = "random"  # "random" | "first" | "round_robin"
-
-    # models
+    provider_router_strategy: str = "random"
     default_model: str = "openai:gpt-4.1-mini"
-    fallback_models: List[str] = None
+    fallback_models: List[str] = field(default_factory=lambda: [
+        "groq:llama-3-70b",
+        "openrouter:gpt-4.1-mini",
+    ])
+    cost_per_1k_tokens: Dict[str, float] = field(default_factory=lambda: {
+        "openai": 0.01,
+        "groq": 0.002,
+        "openrouter": 0.008,
+    })
+    tokens_per_minute: float = 1000.0
+    debug_routing: bool = False
 
-    # cost + token → "minutes" mapping
-    cost_per_1k_tokens: Dict[str, float] = None  # keyed by provider
-    tokens_per_minute: float = 1000.0  # 1 "minute" = 1k tokens by default
+@dataclass
+class GovernanceConfig:
+    master_enabled: bool = True
+    audit_logging: bool = True
+    # Looked up by governance.is_killed()
+    kill_switches: Dict[str, bool] = field(default_factory=lambda: {
+        "global": False
+    })
+    # Looked up by governance.enforce_boundaries()
+    safety_policies: Dict[str, Any] = field(default_factory=lambda: {
+        "enabled": True,
+        "strict_mode": False
+    })
 
-    debug_routing: bool = False  # if True, log why a provider was chosen
+@dataclass
+class MemoryConfig:
+    rag_enabled: bool = True
+    vector_db_path: str = "data/memory.db"
 
-    def __post_init__(self):
-        if self.fallback_models is None:
-            self.fallback_models = [
-                "groq:llama-3-70b",
-                "openrouter:gpt-4.1-mini",
-            ]
+@dataclass
+class DeclarativeKnowledge:
+    # Looked up by reasoning.build_prompt()
+    personality: Dict[str, str] = field(default_factory=lambda: {
+        "tone": "helpful",
+        "style": "concise"
+    })
+    # Looked up by reasoning.build_prompt()
+    rules: Dict[str, str] = field(default_factory=lambda: {
+        "primary": "Always be polite",
+        "secondary": "Verify facts"
+    })
+    # Looked up by governance.enforce_boundaries()
+    boundaries: Dict[str, Any] = field(default_factory=lambda: {
+        "allow_harm": False,
+        "no_insults": True
+    })
 
-        if self.cost_per_1k_tokens is None:
-            self.cost_per_1k_tokens = {
-                "openai": 0.01,
-                "groq": 0.002,
-                "openrouter": 0.008,
-            }
+@dataclass
+class ProceduralReasoning:
+    # Looked up by reasoning.select_strategy()
+    strategies: Dict[str, str] = field(default_factory=lambda: {
+        "explanation": "chain_of_thought",
+        "planning": "step_by_step",
+        "default": "direct_answer"
+    })
+
+@dataclass
+class LearningConfig:
+    daily_learning_enabled: bool = True
+    reflection_prompts: List[str] = field(default_factory=lambda: [
+        "What did we learn from this interaction?"
+    ])
+    proposal_thresholds: Dict[str, float] = field(default_factory=lambda: {
+        "confidence": 0.8
+    })
+
+@dataclass
+class BrainState:
+    agent_id: str
+    version: str
+    governance: GovernanceConfig
+    memory: MemoryConfig
+    providers: ProviderConfig
+    procedural: ProceduralReasoning
+    learning: LearningConfig
+    declarative: DeclarativeKnowledge = field(default_factory=DeclarativeKnowledge)

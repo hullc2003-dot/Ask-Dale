@@ -18,10 +18,7 @@ class LearningLayer:
         self.router = LearningRouter(self.db, config.router_toggles)
         
     def generate_reflection(self, user_input: str, output: str, timestamp: Any) -> Dict[str, Any]:
-        """
-        Standard entry point called by Brain.run().
-        Ensures the orchestrator stays online.
-        """
+        """Standard entry point called by Brain.run()."""
         logger.info(f"Reflecting on intelligence at {timestamp}")
         return {
             "status": "analyzed",
@@ -29,28 +26,19 @@ class LearningLayer:
         }
 
     async def run_learning_cycle(self) -> Dict[str, Any]:
-        """
-        Triggered by the UI 'Run Learning Loop' button.
-        Executes the full Router -> Rewriter -> SQL pipeline.
-        """
-        # 1. Gather the 'Mass'
+        """Executes the full Router -> Rewriter -> SQL pipeline."""
         mass = self.router.gather_all_sources()
-        
-        # 2. Logic for Rewriter handoff goes here
-        # For now, we confirm the intake
         return {
             "summary": f"Ingested {len(mass['source_manifest'])} sources",
             "sources": mass["source_manifest"]
         }
 
 class LearningRouter:
-    """
-    Production-ready Router: Gathers raw data from 4 distinct layers.
-    """
+    """Production-ready Router: Gathers raw data from 4 distinct layers."""
     def __init__(self, db: Client, config: Dict[str, bool] = None):
         self.db = db
         self.config = config or {
-            "use_md": True, # Default to True for SEO documents
+            "use_md": True,
             "use_url": False,
             "use_logic_tables": True,
             "use_op_logic_tables": False
@@ -79,8 +67,6 @@ class LearningRouter:
     def _read_local_md_files(self) -> str:
         collected = []
         try:
-            # Render project root is usually /opt/render/project/src/
-            # We look for MD files in the current directory
             for file in os.listdir("."):
                 if file.endswith(".md"):
                     with open(file, "r", encoding="utf-8") as f:
@@ -100,3 +86,25 @@ class LearningRouter:
                 logger.warning(f"Database Read Error on table {table}: {e}")
                 mass[table] = []
         return mass
+
+# --- THE RENDER FIX: STANDALONE ENTRY POINT ---
+
+async def run_learning_loop(db_client: Client, config_toggles: Dict[str, bool] = None):
+    """
+    THIS IS THE SPECIFIC FUNCTION RENDER IS LOOKING FOR.
+    It bridges the Orchestrator/Server to the LearningRouter.
+    """
+    logger.info("Triggering run_learning_loop via Orchestrator import...")
+    
+    # Initialize the router locally for the loop execution
+    router = LearningRouter(db_client, config_toggles)
+    
+    # Gather the mass data
+    mass_data = router.gather_all_sources()
+    
+    # Return formatted summary for the UI
+    return {
+        "status": "success",
+        "summary": f"Loop complete. {len(mass_data['source_manifest'])} source layers active.",
+        "manifest": mass_data["source_manifest"]
+    }

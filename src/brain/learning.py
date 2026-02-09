@@ -28,6 +28,8 @@ def run_learning_cycle():
     and saves the distilled insights to Supabase for permanent storage.
     """
     cycle_id = str(uuid.uuid4())
+    # Explicit timestamp for database sorting
+    timestamp = datetime.now().isoformat()
     logger.info(f"Starting Learning Cycle: {cycle_id}")
 
     # 1. Load context files
@@ -65,14 +67,12 @@ def run_learning_cycle():
 
     try:
         # 4. Permanent Storage of the Summary
-        # We save this so even if Render restarts, the 'Knowledge' is safe
+        # We explicitly include 'created_at' to fix the ordering error in rewrites.py
         supabase.table("agent_memory").insert({
             "content": f"SUMMARIZED_INSIGHT: {distilled_summary}",
-            "metadata": {"cycle_id": cycle_id, "type": "summary"}
+            "metadata": {"cycle_id": cycle_id, "type": "summary"},
+            "created_at": timestamp 
         }).execute()
-
-        # 5. Clear Learning Material (Optional: prevents re-learning the same text)
-        # write_file("learning_material.md", "") 
 
         return {
             "status": "Success",

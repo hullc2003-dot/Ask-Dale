@@ -45,12 +45,6 @@ class Brain:
                 from src.brain.learning import LearningLayer
                 self.learning_layer = LearningLayer(state.learning)
                 
-        except Exception as e:
-            logger.critical(f"Brain Layer Initialization Failed: {e}")
-            logger.error(traceback.format_exc())
-            raise RuntimeError(f"Could not initialize Brain components: {e}")
-        
-        # semaphore limits to protect Free-tier quotas
         self.request_semaphore = asyncio.Semaphore(3) 
 
     async def run(

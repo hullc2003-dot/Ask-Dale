@@ -150,7 +150,8 @@ def chunk_text(text: str, min_words: int = 100, max_words: int = 1000) -> List[s
 
     return chunks
 
-    def apply_rewrites(self): pass
+    def apply_rewrites(self):
+        pass
 
 
 # ---- MAIN AGENT CLASS ----

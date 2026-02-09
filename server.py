@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 import os
-import async
+
 
 # --- PATH CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

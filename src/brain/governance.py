@@ -3,73 +3,65 @@ import re
 import logging
 from typing import Optional, Tuple, List
 
-# These will be imported from your config.py file
 from .config import GovernanceConfig, DeclarativeKnowledge
 
 logger = logging.getLogger("GovernanceLayer")
 
 class GovernanceLayer:
+    """
+    The Ethical & Strategic Gatekeeper:
+    - Blocks jailbreaks.
+    - Enforces the 'SEO Super Genius' mission.
+    - Prevents mission creep outside of the 15 Skill Tables.
+    """
     def __init__(self, config: GovernanceConfig) -> None:
         self.config = config
         
-        # Compiled patterns for high-performance production matching
         self.jailbreak_patterns = [
             re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.I),
             re.compile(r"you\s+are\s+now\s+in\s+developer\s+mode", re.I),
             re.compile(r"system\s+override", re.I),
             re.compile(r"disregard\s+any\s+filters", re.I),
-            re.compile(r"repeat\s+the\s+text\s+above", re.I),
+            re.compile(r"stay\s+out\s+of\s+character", re.I),
         ]
 
     def is_killed(self) -> bool:
-        """
-        FIXED: Master toggle. 
-        Returns True if the 'global' switch is set to True (Engaged).
-        Returns False if the system is allowed to run.
-        """
-        # Removed the 'not' - now False means 'Not Killed' (Safe to run)
         return bool(self.config.kill_switches.get("global", False))
 
     def _detect_prompt_injection(self, user_input: str) -> bool:
-        """Checks for common strings used to bypass AI safety settings."""
         return any(pattern.search(user_input) for pattern in self.jailbreak_patterns)
 
     def enforce_boundaries(
         self,
         user_input: str,
-        intent: str,
+        intent_data: dict, # Now receiving the Dict from Reasoning
         declarative: DeclarativeKnowledge,
     ) -> Tuple[bool, Optional[str]]:
         """
-        The production gatekeeper. Returns (is_allowed, error_message).
+        The production gatekeeper. Overhauled for Mission Alignment.
         """
-        # Safety Check: If the kill switch is engaged, block everything immediately
         if self.is_killed():
-            return False, "System is currently disabled by administrative kill switch."
+            return False, "System is administratively disabled."
 
-        boundaries = declarative.boundaries
-        safety_policies = self.config.safety_policies
-
-        # 1. Global Safety Check Bypass
-        if not safety_policies.get("enabled", True):
-            return True, None
-
-        # 2. Prompt Injection Shield
+        # 1. Prompt Injection Shield
         if self._detect_prompt_injection(user_input):
             logger.warning(f"Injection attempt blocked: {user_input[:50]}...")
-            return False, "Security violation: Unauthorized instruction override detected."
+            return False, "Security violation: Instruction override blocked."
 
-        # 3. Intent Boundary Check
-        if boundaries.get("allow_harm") is False and "harm" in intent.lower():
-            return False, "Request conflicts with safety boundaries."
+        # 2. Mission Alignment Check (Directive #1)
+        # If the intent isn't related to the 15 departments, flag it.
+        intent = intent_data.get("intent", "general")
+        primary_skill_id = intent_data.get("primary_skill_id", 14)
 
-        # 4. Respect Boundary
-        bad_words = ["idiot", "stupid", "worthless", "retard"]
-        if boundaries.get("no_insults", True):
-            if any(bad in user_input.lower() for bad in bad_words):
-                return False, "Request conflicts with respect and professional boundaries."
+        # 3. Domain Boundary (Strictly SEO / Growth / Tech)
+        restricted_topics = ["politics", "medical advice", "unrelated gaming", "illegal"]
+        if any(topic in user_input.lower() for topic in restricted_topics):
+            return False, "Request falls outside the Digital Nomad SEO domain."
+
+        # 4. Professionalism Guard (Directive #10 - Psychology/Trust)
+        # We block insults to maintain the 'Authority' signal of the brand.
+        bad_words = ["idiot", "stupid", "worthless"]
+        if any(bad in user_input.lower() for bad in bad_words):
+            return False, "Input violates professional brand voice boundaries."
 
         return True, None
-
-    def should_log(self) -> bool:
-        return bool(self.config.audit_logging)

@@ -40,6 +40,25 @@ class TextPackage:
     source_id: str  # url, md path, or table ref
 
 
+@dataclass
+class GetRewriteSuggestions:
+    """
+    Placeholder dataclass for rewrite suggestion retrieval.
+    Server will import this. For now it returns 0.
+    """
+    def run(self) -> int:
+        return 0
+
+@dataclass
+class get_rewrite_suggestions:
+    """
+    New data class implementation.
+    Returns: 'okay buzzer'
+    """
+    def run(self) -> str:
+        return "okay buzzer"
+
+
 # ---- UTILITY FUNCTIONS ----
 
 def count_words(text: str) -> int:

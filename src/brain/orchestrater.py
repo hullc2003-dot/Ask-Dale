@@ -1,51 +1,55 @@
 from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
 import traceback
 from typing import Any, Dict, List, Optional
 
-# Standard config and layer imports
 from .config import BrainState
 from .governance import GovernanceLayer
 from .memory import MemoryLayer
 from .provider import ProviderLayer
 from .reasoning import ReasoningLayer
 
-# WE REMOVE THE TOP-LEVEL LEARNING IMPORT TO PREVENT CIRCULAR CRASHES
-# from .learning import LearningLayer 
-
 logger = logging.getLogger("BrainOrchestrator")
+
 
 class Brain:
     """
     The SEO Super Genius Hub.
-    Orchestrates 15 specialized departments to dominate search revenue.
-    Fixed with Lazy Loading to prevent Render 'ImportError' boot crashes.
+    Orchestrates specialized departments to dominate search revenue.
+    Uses lazy-loading and fail-safe execution paths.
     """
 
     def __init__(self, state: BrainState) -> None:
         self.state = state
-        
+
+        # Core layers
+        self.governance = GovernanceLayer(state.governance)
+        self.memory_layer = MemoryLayer(state.memory)
+        self.provider_layer = ProviderLayer(state.providers)
+        self.reasoning_layer = ReasoningLayer(state.procedural)
+
+        # Lazy-loaded learning layer
+        self.learning_layer = None
         try:
-            # Initialize core layers
-            self.governance = GovernanceLayer(state.governance)
-            self.memory_layer = MemoryLayer(state.memory)
-            self.provider_layer = ProviderLayer(state.providers)
-            self.reasoning_layer = ReasoningLayer(state.procedural)
-            
-            # --- CRITICAL: LAZY IMPORT ---
-            # We import here so the Orchestrator is already initialized.
-            # This bypasses the 'cannot import name LearningLayer' ghost error.
+            from .learning import LearningLayer
+            self.learning_layer = LearningLayer(state.learning)
+        except ImportError:
             try:
-                from .learning import LearningLayer
-                self.learning_layer = LearningLayer(state.learning)
-            except ImportError:
-                # Fallback for specific Render pathing quirks
                 from src.brain.learning import LearningLayer
                 self.learning_layer = LearningLayer(state.learning)
-                
-        self.request_semaphore = asyncio.Semaphore(3) 
+            except ImportError:
+                logger.warning("LearningLayer disabled: import failed")
+
+        # Async primitives (lazy init)
+        self._semaphore: Optional[asyncio.Semaphore] = None
+
+    def _get_semaphore(self) -> asyncio.Semaphore:
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(3)
+        return self._semaphore
 
     async def run(
         self,
@@ -55,44 +59,57 @@ class Brain:
         use_memory: bool = True,
         use_learning: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Specialized Loop: Detects Skill Department -> Retrieves Mastery -> Executes Strategy.
-        """
+
         timestamp = datetime.datetime.now(datetime.timezone.utc)
+
         response_base = {
             "agent_id": self.state.agent_id,
             "timestamp": timestamp.isoformat(),
         }
 
-        # 1. GOVERNANCE & KILL SWITCH
-        if not self.state.governance.master_enabled or (use_governance and self.governance.is_killed()):
-            return {**response_base, "status": "blocked", "reason": "System Governance Offline."}
+        # 1. Governance kill switch
+        if not self.state.governance.master_enabled:
+            return {**response_base, "status": "blocked", "reason": "Master governance disabled"}
 
-        # 2. OVERHAULED INTENT DETECTION (15 Tables)
+        # 2. Intent detection
         intent_data = self.reasoning_layer.detect_intent(user_input)
         primary_skill_id = intent_data["primary_skill_id"]
 
-        # 3. PARALLEL PRE-PROCESSING
-        tasks = []
-        if use_governance:
-            tasks.append(self._check_governance(user_input, intent_data["intent"]))
-        if use_memory:
-            tasks.append(self._retrieve_specialist_context(user_input, primary_skill_id))
+        # 3. Pre-processing
+        governance_task = None
+        memory_task = None
 
-        pre_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+        if use_governance:
+            governance_task = asyncio.create_task(
+                self._check_governance(user_input, intent_data["intent"])
+            )
+
+        if use_memory:
+            memory_task = asyncio.create_task(
+                self._retrieve_specialist_context(user_input, primary_skill_id)
+            )
+
         governance_ok, violation_reason = True, None
         context_chunks: List[str] = []
 
-        for res in pre_results:
-            if isinstance(res, tuple): governance_ok, violation_reason = res
-            elif isinstance(res, list): context_chunks = res
+        if governance_task:
+            try:
+                governance_ok, violation_reason = await governance_task
+            except Exception:
+                logger.error("Governance failure:\n%s", traceback.format_exc())
+                return {**response_base, "status": "blocked", "reason": "Governance error"}
 
         if not governance_ok:
             return {**response_base, "status": "blocked", "reason": violation_reason}
 
-        # 4. STRATEGY & PROMPT
-        strategy = self.reasoning_layer.select_strategy(intent_data=intent_data)
+        if memory_task:
+            try:
+                context_chunks = await memory_task
+            except Exception:
+                logger.warning("Memory retrieval failed:\n%s", traceback.format_exc())
+
+        # 4. Strategy & prompt
+        strategy = self.reasoning_layer.select_strategy(intent_data)
         prompt = self.reasoning_layer.build_prompt(
             user_input=user_input,
             intent_data=intent_data,
@@ -101,44 +118,50 @@ class Brain:
             context_chunks=context_chunks,
         )
 
-        # 5. EXECUTION
-        async with self.request_semaphore:
+        # 5. Model execution
+        async with self._get_semaphore():
             try:
                 model = self.provider_layer.select_model(intent=intent_data["intent"])
-                output = await self.provider_layer.call_model(model_tag=model, prompt=prompt)
+                output = await asyncio.wait_for(
+                    self.provider_layer.call_model(model_tag=model, prompt=prompt),
+                    timeout=60,
+                )
             except Exception as e:
-                return {**response_base, "status": "error", "reason": f"Provider Error: {e}"}
+                logger.error("Provider error:\n%s", traceback.format_exc())
+                return {**response_base, "status": "error", "reason": str(e)}
 
-        # 6. ASYNC POST-PROCESSING
-        post_tasks = []
+        # 6. Post-processing (best effort)
         if use_memory:
-            post_tasks.append(self._write_specialist_memory(user_input, output, intent_data))
-        if use_learning:
-            post_tasks.append(self._generate_learning(user_input, output, timestamp))
+            asyncio.create_task(
+                self._write_specialist_memory(user_input, output, intent_data)
+            )
 
-        await asyncio.gather(*post_tasks, return_exceptions=True)
-        
+        if use_learning and self.learning_layer:
+            asyncio.create_task(
+                self._generate_learning(user_input, output, timestamp)
+            )
+
         return {
             **response_base,
             "status": "ok",
             "department_id": primary_skill_id,
             "strategy": strategy,
-            "output": output
+            "output": output,
         }
 
-    # --- SPECIALIST WRAPPERS ---
+    # --- Specialist wrappers ---
 
     async def _retrieve_specialist_context(self, user_input: str, skill_id: int):
         return await self.memory_layer.retrieve_context(
             user_input=user_input,
-            skill_id=skill_id
+            skill_id=skill_id,
         )
 
     async def _write_specialist_memory(self, user_input, output, intent_data):
         return await self.memory_layer.write_specialist_intel(
             user_input=user_input,
             output=output,
-            intent_data=intent_data
+            intent_data=intent_data,
         )
 
     async def _check_governance(self, user_input: str, intent: str):
@@ -149,5 +172,7 @@ class Brain:
         )
 
     async def _generate_learning(self, user_input, output, timestamp):
-        reflection = self.learning_layer.generate_reflection(user_input, output, timestamp)
+        reflection = self.learning_layer.generate_reflection(
+            user_input, output, timestamp
+        )
         return {"reflection": reflection}

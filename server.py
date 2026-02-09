@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 import os
-import asyncio
+import async
 
 # --- PATH CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,9 +22,7 @@ try:
     from src.brain.learning import LearningLayer
     # Note: Ensure these exist in your rewriter module
     from src.brain.rewrites import get_rewrite_suggestions, apply_rewrites
-except ImportError as e:
-    print(f"FATAL: Missing brain modules: {e}")
-    sys.exit(1)
+
 
 # --- INITIALIZE FASTAPI & LOGGING ---
 logging.basicConfig(level=logging.INFO)

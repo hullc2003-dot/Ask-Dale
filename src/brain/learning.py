@@ -1,78 +1,94 @@
-from __future__ import annotations
 import os
 import logging
-from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any, List
+from supabase import Client
 
-logger = logging.getLogger("LearningCycle")
+logger = logging.getLogger("LearningRouter")
 
-class LearningCycle:
+class LearningRouter:
     """
-    HEAVY FOCUS: This cycle treats 'learning_material.md' as the source of truth.
-    It synchronizes the Brain's internal state with the external material.
+    Production-ready Router: Gathers raw data from 4 distinct layers.
+    It triggers based on Booleans and hands the 'Mass' to Rewrites.
     """
-    def __init__(self, material_path: str = "learning_material.md") -> None:
-        self.material_path = material_path
+    def __init__(self, db: Client, config: Dict[str, bool] = None):
+        self.db = db
+        # Default Booleans: All OFF unless specified
+        self.config = config or {
+            "use_md": False,
+            "use_url": False,
+            "use_logic_tables": False,
+            "use_op_logic_tables": False
+        }
+        
+        # Hardcoded Technical Sources
+        self.target_url = "https://www.geeksforgeeks.org/artificial-intelligence/agentic-ai-tutorial/"
+        self.logic_tables = ["rules", "skills", "capability_registry", "bot_memory"]
+        self.op_logic_tables = [
+            "traits", "personas", "interaction_patterns", 
+            "response_styles", "conversation_examples"
+        ]
 
-    def run_sync_cycle(self, current_state: Dict[str, Any]) -> Dict[str, Any]:
+    def gather_all_sources(self) -> Dict[str, Any]:
         """
-        The core loop: Read Material -> Extract Knowledge -> Compare to State -> Propose Updates.
+        The main entry point. Orchestrates the gathering of the 'Mass'.
         """
-        # 1. LOAD THE "TEXTBOOK"
-        material_content = self._read_material()
-        if not material_content:
-            return {"status": "skipped", "reason": "No learning material found."}
-
-        # 2. EXTRACT RELEVANT KNOWLEDGE
-        # We look for specific markers like "### New Rule" or "### Fact"
-        new_knowledge = self._parse_material(material_content)
-
-        # 3. COMPARE & DETECT GAPS
-        # Does the current Brain State actually know what's in the file?
-        proposals = self._align_state_to_material(current_state, new_knowledge)
-
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "source": self.material_path,
-            "knowledge_found": list(new_knowledge.keys()),
-            "proposals": proposals,
-            "material_snapshot": material_content[:500] + "..." # For audit logging
+        mass_data = {
+            "source_manifest": [],
+            "raw_payloads": []
         }
 
-    def _read_material(self) -> str:
-        if not os.path.exists(self.material_path):
-            logger.warning(f"Material file {self.material_path} missing.")
+        # --- LAYER 1: MD DOCUMENTS ---
+        if self.config.get("use_md"):
+            md_content = self._read_local_md_files()
+            if md_content:
+                mass_data["raw_payloads"].append({"type": "md_files", "content": md_content})
+                mass_data["source_manifest"].append("local_filesystem")
+
+        # --- LAYER 2: URLS ---
+        if self.config.get("use_url"):
+            # Note: In production, you'd call your scraping utility here
+            mass_data["raw_payloads"].append({"type": "url_mass", "url": self.target_url})
+            mass_data["source_manifest"].append("external_web_tutorial")
+
+        # --- LAYER 3: LOGIC TABLES (Technical Rules) ---
+        if self.config.get("use_logic_tables"):
+            logic_mass = self._fetch_tables(self.logic_tables)
+            mass_data["raw_payloads"].append({"type": "logic_tables", "content": logic_mass})
+            mass_data["source_manifest"].append("supabase_logic_core")
+
+        # --- LAYER 4: OPERATIONAL LOGIC TABLES (Personality/Behavior) ---
+        if self.config.get("use_op_logic_tables"):
+            op_mass = self._fetch_tables(self.op_logic_tables)
+            mass_data["raw_payloads"].append({"type": "op_logic_tables", "content": op_mass})
+            mass_data["source_manifest"].append("supabase_op_behavior")
+
+        return mass_data
+
+    def _read_local_md_files(self) -> str:
+        """Scans directory for all .md files and joins them into one mass."""
+        collected = []
+        try:
+            for file in os.listdir("."):
+                if file.endswith(".md"):
+                    with open(file, "r", encoding="utf-8") as f:
+                        collected.append(f"--- FILE: {file} ---\n{f.read()}")
+            return "\n\n".join(collected)
+        except Exception as e:
+            logger.error(f"MD Read Error: {e}")
             return ""
-        with open(self.material_path, "r", encoding="utf-8") as f:
-            return f.read()
 
-    def _parse_material(self, text: str) -> Dict[str, str]:
-        """
-        Advanced parsing: Looks for Markdown headers to categorize learning.
-        """
-        sections = {}
-        current_header = None
-        for line in text.splitlines():
-            if line.startswith("###"):
-                current_header = line.replace("###", "").strip().lower()
-                sections[current_header] = ""
-            elif current_header:
-                sections[current_header] += line + "\n"
-        return sections
+    def _fetch_tables(self, table_list: List[str]) -> Dict[str, List[Any]]:
+        """Pull raw rows from Supabase for a list of tables."""
+        mass = {}
+        for table in table_list:
+            try:
+                response = self.db.table(table).select("*").execute()
+                mass[table] = response.data
+            except Exception as e:
+                logger.warning(f"Database Read Error on table {table}: {e}")
+                mass[table] = []
+        return mass
 
-    def _align_state_to_material(self, state: Dict[str, Any], knowledge: Dict[str, str]) -> List[Dict[str, Any]]:
-        proposals = []
-        current_rules = state.get("declarative", {}).get("rules", {})
-
-        for category, content in knowledge.items():
-            # If the material has a category the brain doesn't have, or if the content differs
-            if category not in current_rules or content.strip() not in str(current_rules.values()):
-                proposals.append({
-                    "type": "KNOWLEDGE_INTEGRATION",
-                    "priority": "high",
-                    "category": category,
-                    "update": content.strip(),
-                    "reason": f"New content detected in {self.material_path}"
-                })
-        return proposals
-    return f"Suggestion {suggestion_id} denied."
+# --- PRODUCTION EXECUTION EXAMPLE ---
+# router = LearningRouter(supabase_client, {"use_md": True, "use_logic_tables": True})
+# mass_for_rewrites = router.gather_all_sources()

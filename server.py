@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import sys
 import os
-
+import asyncio
 
 # --- PATH CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,10 +19,12 @@ if os.path.exists(SRC_PATH) and SRC_PATH not in sys.path:
 try:
     from src.brain.orchestrater import Brain
     from src.brain.config import BrainState
-    from src.brain.learning import LearningLayer
+    from src.brain.learning import learning
     # Note: Ensure these exist in your rewriter module
     from src.brain.rewrites import get_rewrite_suggestions, apply_rewrites
-
+except ImportError as e:
+    print(f"FATAL: Missing brain modules: {e}")
+    sys.exit(1)
 
 # --- INITIALIZE FASTAPI & LOGGING ---
 logging.basicConfig(level=logging.INFO)

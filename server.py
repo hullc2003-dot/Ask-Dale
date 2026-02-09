@@ -19,7 +19,7 @@ if os.path.exists(SRC_PATH) and SRC_PATH not in sys.path:
 try:
     from src.brain.orchestrater import Brain
     from src.brain.config import BrainState
-    from src.brain.learning import learning
+    from src.brain.learning import run_learning_cycle
     # Note: Ensure these exist in your rewriter module
     from src.brain.rewrites import get_rewrite_suggestions, apply_rewrites
 except ImportError as e:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 
 @dataclass
@@ -36,6 +36,8 @@ class GovernanceConfig:
 class MemoryConfig:
     rag_enabled: bool = True
     vector_db_path: str = "data/memory.db"
+    # Placeholder for the active database client
+    db_client: Any = None 
 
 @dataclass
 class DeclarativeKnowledge:
@@ -69,6 +71,14 @@ class LearningConfig:
     proposal_thresholds: Dict[str, float] = field(default_factory=lambda: {
         "confidence": 0.8
     })
+    
+    # Configuration for the LearningRouter
+    router_toggles: Dict[str, bool] = field(default_factory=lambda: {
+        "use_md": True,
+        "use_url": False,
+        "use_logic_tables": True,
+        "use_op_logic_tables": False
+    })
 
     # --- REQUIRED FOR LEARNINGLAYER ---
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
@@ -77,11 +87,15 @@ class LearningConfig:
 
 @dataclass
 class BrainState:
-    agent_id: str
-    version: str
-    governance: GovernanceConfig
-    memory: MemoryConfig
-    providers: ProviderConfig
-    procedural: ProceduralReasoning
-    learning: LearningConfig
+    """
+    The central state of the agent. 
+    Defaults are provided for all fields to ensure safe instantiation.
+    """
+    agent_id: str = "gemini-agent-v2"
+    version: str = "2.1.0"
+    governance: GovernanceConfig = field(default_factory=GovernanceConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    providers: ProviderConfig = field(default_factory=ProviderConfig)
+    procedural: ProceduralReasoning = field(default_factory=ProceduralReasoning)
+    learning: LearningConfig = field(default_factory=LearningConfig)
     declarative: DeclarativeKnowledge = field(default_factory=DeclarativeKnowledge)

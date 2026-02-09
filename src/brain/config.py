@@ -83,7 +83,7 @@ class LearningConfig:
     # --- REQUIRED FOR LEARNINGLAYER ---
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
-    SUPABASE_SERVICE_ROLE: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 @dataclass
 class BrainState:

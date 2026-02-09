@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from .config import BrainState
 from .governance import GovernanceLayer
-from .memory import MemoryLayer
+from .memory import MemoryAgent
 from .provider import ProviderLayer
 from .reasoning import ReasoningLayer
 
@@ -27,7 +27,7 @@ class Brain:
 
         # Core layers
         self.governance = GovernanceLayer(state.governance)
-        self.memory_layer = MemoryLayer(state.memory)
+        self.memory_agent = MemoryAgent(state.memory)
         self.provider_layer = ProviderLayer(state.providers)
         self.reasoning_layer = ReasoningLayer(state.procedural)
 

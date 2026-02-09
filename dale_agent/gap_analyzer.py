@@ -34,7 +34,7 @@ class GapAnalyzer:
     def __init__(self, supabase: Client):
         self.supabase = supabase
 
-    async def analyze(self) -> Dict[str, Any]:
+    def analyze(self) -> Dict[str, List[Dict[str, Any]]]:
         report: Dict[str, List[Dict[str, Any]]] = {}
 
         for table in SPECIALIST_TABLES:
@@ -42,16 +42,18 @@ class GapAnalyzer:
                 empty_rows = self._find_empty_rows(table)
                 if empty_rows:
                     report[table] = empty_rows
-            except Exception as e:
-                logger.exception(f"Error analyzing gaps in {table}: {e}")
+            except Exception:
+                logger.exception(f"Error analyzing gaps in {table}")
 
         return report
 
     def _find_empty_rows(self, table: str) -> List[Dict[str, Any]]:
         resp = (
-            self.supabase.table(table)
+            self.supabase
+            .table(table)
             .select("id, title, content")
-            .or_("content.is.null,content.eq.")
+            .or_("content.is.null,content.eq.''")
+            .range(0, 9999)
             .execute()
         )
         return resp.data or []

@@ -2,15 +2,10 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import sys
 from typing import Any, Dict, List, Optional
 
 from .config import BrainState
 from .governance import GovernanceLayer
-
-# --- CRITICAL: Strict Imports ---
-# We remove the try/except here so that Render's logs show the REAL 
-# path error (e.g., ModuleNotFoundError) instead of a vague NameError later.
 from .memory import MemoryLayer
 from .provider import ProviderLayer
 from .reasoning import ReasoningLayer
@@ -20,14 +15,13 @@ logger = logging.getLogger("BrainOrchestrator")
 
 class Brain:
     """
-    The central hub. Fixed to ensure all layers are properly defined
-    before initialization.
+    The SEO Super Genius Hub.
+    Orchestrates 15 specialized departments to dominate search revenue.
     """
 
     def __init__(self, state: BrainState) -> None:
         self.state = state
         
-        # Initialize Layers
         try:
             self.governance = GovernanceLayer(state.governance)
             self.memory_layer = MemoryLayer(state.memory)
@@ -38,7 +32,7 @@ class Brain:
             logger.critical(f"Brain Layer Initialization Failed: {e}")
             raise RuntimeError(f"Could not initialize Brain components: {e}")
         
-        # Protects Free-tier keys from 429 (Too Many Requests) errors
+        # semaphore limits to protect Free-tier quotas
         self.request_semaphore = asyncio.Semaphore(3) 
 
     async def run(
@@ -50,35 +44,30 @@ class Brain:
         use_learning: bool = True,
     ) -> Dict[str, Any]:
         """
-        Main execution loop with safety-first logic.
+        Specialized Loop: Detects Skill Department -> Retrieves Mastery -> Executes Strategy.
         """
-        # Using timezone-aware UTC for 2026 standards
         timestamp = datetime.datetime.now(datetime.timezone.utc)
         response_base = {
             "agent_id": self.state.agent_id,
-            "brain_version": self.state.version,
             "timestamp": timestamp.isoformat(),
         }
 
-        # 1. KILL SWITCH CHECKS
-        if not self.state.governance.master_enabled:
-            return {**response_base, "status": "disabled", "reason": "Master toggle is OFF."}
+        # 1. GOVERNANCE & KILL SWITCH
+        if not self.state.governance.master_enabled or (use_governance and self.governance.is_killed()):
+            return {**response_base, "status": "blocked", "reason": "System Governance Offline."}
 
-        if use_governance and self.governance.is_killed():
-            return {**response_base, "status": "killed", "reason": "Global kill switch active."}
+        # 2. OVERHAULED INTENT DETECTION (15 Tables)
+        # reasoning_layer now returns a Dict with 'primary_skill_id'
+        intent_data = self.reasoning_layer.detect_intent(user_input)
+        primary_skill_id = intent_data["primary_skill_id"]
 
-        # 2. PARALLEL PRE-PROCESSING
-        # Detect intent first
-        try:
-            intent = self.reasoning_layer.detect_intent(user_input)
-        except AttributeError:
-            intent = "general" # Fallback if layer is placeholder
-
+        # 3. PARALLEL SPECIALIST PRE-PROCESSING
         tasks = []
         if use_governance:
-            tasks.append(self._check_governance(user_input, intent))
+            tasks.append(self._check_governance(user_input, intent_data["intent"]))
         if use_memory:
-            tasks.append(self._retrieve_memory(user_input))
+            # We now pass the skill_id so memory knows WHICH table to retrieve from
+            tasks.append(self._retrieve_specialist_context(user_input, primary_skill_id))
 
         pre_results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -86,39 +75,36 @@ class Brain:
         context_chunks: List[str] = []
 
         for res in pre_results:
-            if isinstance(res, tuple): 
-                governance_ok, violation_reason = res
-            elif isinstance(res, list): 
-                context_chunks = res
-            elif isinstance(res, Exception):
-                logger.error(f"Pre-processing task failed: {res}")
+            if isinstance(res, tuple): governance_ok, violation_reason = res
+            elif isinstance(res, list): context_chunks = res
 
         if not governance_ok:
             return {**response_base, "status": "blocked", "reason": violation_reason}
 
-        # 3. STRATEGY & PROMPT BUILDING
-        strategy = self.reasoning_layer.select_strategy(intent=intent)
+        # 4. SPECIALIST STRATEGY & PROMPT
+        strategy = self.reasoning_layer.select_strategy(intent_data=intent_data)
         prompt = self.reasoning_layer.build_prompt(
             user_input=user_input,
-            intent=intent,
+            intent_data=intent_data,
             strategy=strategy,
             declarative=self.state.declarative,
             context_chunks=context_chunks,
         )
 
-        # 4. PROTECTED PROVIDER CALL
+        # 5. EXECUTION
         async with self.request_semaphore:
             try:
-                model = self.provider_layer.select_model(intent=intent)
+                model = self.provider_layer.select_model(intent=intent_data["intent"])
                 output = await self.provider_layer.call_model(model_tag=model, prompt=prompt)
             except Exception as e:
-                logger.error(f"Provider Failure: {str(e)}")
-                return {**response_base, "status": "error", "reason": f"AI Provider failure: {e}"}
+                return {**response_base, "status": "error", "reason": f"Provider Error: {e}"}
 
-        # 5. ASYNC POST-PROCESSING
+        # 6. ASYNC MASTERY FILING (Post-Processing)
+        # This is where the Rewriter/Memory overhaul kicks in
         post_tasks = []
         if use_memory:
-            post_tasks.append(self._write_memory(user_input, output, intent, strategy))
+            # Files the output into the correct Mastery Table (1-15) and Strategy Table
+            post_tasks.append(self._write_specialist_memory(user_input, output, intent_data))
         if use_learning:
             post_tasks.append(self._generate_learning(user_input, output, timestamp))
 
@@ -127,13 +113,28 @@ class Brain:
         return {
             **response_base,
             "status": "ok",
-            "intent": intent,
+            "department_id": primary_skill_id,
             "strategy": strategy,
-            "model": model,
             "output": output
         }
 
-    # --- ASYNC WRAPPERS ---
+    # --- OVERHAULED SPECIALIST WRAPPERS ---
+
+    async def _retrieve_specialist_context(self, user_input: str, skill_id: int):
+        """Retrieves mastery nodes specifically from the relevant skill table."""
+        return await self.memory_layer.retrieve_context(
+            user_input=user_input,
+            skill_id=skill_id
+        )
+
+    async def _write_specialist_memory(self, user_input, output, intent_data):
+        """Triggers the Rewriter to break output into LogicNodes for the 15 Tables."""
+        # This call now targets your specific skill tables and the strategy table
+        return await self.memory_layer.write_specialist_intel(
+            user_input=user_input,
+            output=output,
+            intent_data=intent_data
+        )
 
     async def _check_governance(self, user_input: str, intent: str):
         return self.governance.enforce_boundaries(
@@ -142,21 +143,6 @@ class Brain:
             declarative=self.state.declarative,
         )
 
-    async def _retrieve_memory(self, user_input: str):
-        return self.memory_layer.retrieve_context(
-            user_input=user_input,
-            agent_id=self.state.agent_id,
-        )
-
-    async def _write_memory(self, user_input, output, intent, strategy):
-        return self.memory_layer.write_memory(
-            agent_id=self.state.agent_id,
-            user_input=user_input,
-            output=output,
-            metadata={"intent": intent, "strategy": strategy}
-        )
-
     async def _generate_learning(self, user_input, output, timestamp):
         reflection = self.learning_layer.generate_reflection(user_input, output, timestamp)
-        proposal = self.learning_layer.propose_update(reflection) if reflection else None
-        return {"reflection": reflection, "proposal": proposal}
+        return {"reflection": reflection}

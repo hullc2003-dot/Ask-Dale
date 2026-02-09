@@ -2,14 +2,18 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import traceback
 from typing import Any, Dict, List, Optional
 
+# Standard config and layer imports
 from .config import BrainState
 from .governance import GovernanceLayer
 from .memory import MemoryLayer
 from .provider import ProviderLayer
 from .reasoning import ReasoningLayer
-from .learning import LearningLayer
+
+# WE REMOVE THE TOP-LEVEL LEARNING IMPORT TO PREVENT CIRCULAR CRASHES
+# from .learning import LearningLayer 
 
 logger = logging.getLogger("BrainOrchestrator")
 
@@ -17,19 +21,33 @@ class Brain:
     """
     The SEO Super Genius Hub.
     Orchestrates 15 specialized departments to dominate search revenue.
+    Fixed with Lazy Loading to prevent Render 'ImportError' boot crashes.
     """
 
     def __init__(self, state: BrainState) -> None:
         self.state = state
         
         try:
+            # Initialize core layers
             self.governance = GovernanceLayer(state.governance)
             self.memory_layer = MemoryLayer(state.memory)
             self.provider_layer = ProviderLayer(state.providers)
             self.reasoning_layer = ReasoningLayer(state.procedural)
-            self.learning_layer = LearningLayer(state.learning)
+            
+            # --- CRITICAL: LAZY IMPORT ---
+            # We import here so the Orchestrator is already initialized.
+            # This bypasses the 'cannot import name LearningLayer' ghost error.
+            try:
+                from .learning import LearningLayer
+                self.learning_layer = LearningLayer(state.learning)
+            except ImportError:
+                # Fallback for specific Render pathing quirks
+                from src.brain.learning import LearningLayer
+                self.learning_layer = LearningLayer(state.learning)
+                
         except Exception as e:
             logger.critical(f"Brain Layer Initialization Failed: {e}")
+            logger.error(traceback.format_exc())
             raise RuntimeError(f"Could not initialize Brain components: {e}")
         
         # semaphore limits to protect Free-tier quotas
@@ -57,16 +75,14 @@ class Brain:
             return {**response_base, "status": "blocked", "reason": "System Governance Offline."}
 
         # 2. OVERHAULED INTENT DETECTION (15 Tables)
-        # reasoning_layer now returns a Dict with 'primary_skill_id'
         intent_data = self.reasoning_layer.detect_intent(user_input)
         primary_skill_id = intent_data["primary_skill_id"]
 
-        # 3. PARALLEL SPECIALIST PRE-PROCESSING
+        # 3. PARALLEL PRE-PROCESSING
         tasks = []
         if use_governance:
             tasks.append(self._check_governance(user_input, intent_data["intent"]))
         if use_memory:
-            # We now pass the skill_id so memory knows WHICH table to retrieve from
             tasks.append(self._retrieve_specialist_context(user_input, primary_skill_id))
 
         pre_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -81,7 +97,7 @@ class Brain:
         if not governance_ok:
             return {**response_base, "status": "blocked", "reason": violation_reason}
 
-        # 4. SPECIALIST STRATEGY & PROMPT
+        # 4. STRATEGY & PROMPT
         strategy = self.reasoning_layer.select_strategy(intent_data=intent_data)
         prompt = self.reasoning_layer.build_prompt(
             user_input=user_input,
@@ -99,11 +115,9 @@ class Brain:
             except Exception as e:
                 return {**response_base, "status": "error", "reason": f"Provider Error: {e}"}
 
-        # 6. ASYNC MASTERY FILING (Post-Processing)
-        # This is where the Rewriter/Memory overhaul kicks in
+        # 6. ASYNC POST-PROCESSING
         post_tasks = []
         if use_memory:
-            # Files the output into the correct Mastery Table (1-15) and Strategy Table
             post_tasks.append(self._write_specialist_memory(user_input, output, intent_data))
         if use_learning:
             post_tasks.append(self._generate_learning(user_input, output, timestamp))
@@ -118,18 +132,15 @@ class Brain:
             "output": output
         }
 
-    # --- OVERHAULED SPECIALIST WRAPPERS ---
+    # --- SPECIALIST WRAPPERS ---
 
     async def _retrieve_specialist_context(self, user_input: str, skill_id: int):
-        """Retrieves mastery nodes specifically from the relevant skill table."""
         return await self.memory_layer.retrieve_context(
             user_input=user_input,
             skill_id=skill_id
         )
 
     async def _write_specialist_memory(self, user_input, output, intent_data):
-        """Triggers the Rewriter to break output into LogicNodes for the 15 Tables."""
-        # This call now targets your specific skill tables and the strategy table
         return await self.memory_layer.write_specialist_intel(
             user_input=user_input,
             output=output,

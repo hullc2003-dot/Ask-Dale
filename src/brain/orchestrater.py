@@ -27,7 +27,7 @@ class Brain:
 
         # Core layers
         self.governance = GovernanceLayer(state.governance)
-        self.memory_agent = MemoryAgent(state.memory)
+        self.memory_agent = MemoryAgent()
         self.provider_layer = ProviderLayer(state.providers)
         self.reasoning_layer = ReasoningLayer(state.procedural)
 

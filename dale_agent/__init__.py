@@ -4,7 +4,7 @@ from .gap_analyzer import GapAnalyzer
 from .improvement_engine import ImprovementEngine
 from .feedback_memory import FeedbackMemory
 from .content_writer import ContentWriter
-from .agent_router import 
+from .agent_router import AgentRouter
 __all__ = [
     "DaleAgent",
     "JunkDrawerProcessor",

@@ -12,7 +12,10 @@ import logging
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for WordPress requests
+CORS(app, origins=[
+    "https://digitalnomadresourcecenter.com",
+    "http://digitalnomadresourcecenter.com"
+])
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

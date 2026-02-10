@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import os
 import logging
 from typing import Dict, Any, List, Callable
@@ -66,7 +67,6 @@ def count_words(text: str) -> int:
 
 
 def split_into_sentences(text: str) -> List[str]:
-    import re
     parts = re.split(r'([.!?])', text)
     sentences: List[str] = []
     current = ""
@@ -80,6 +80,14 @@ def split_into_sentences(text: str) -> List[str]:
     if current.strip():
         sentences.append(current.strip())
     return [s for s in sentences if s]
+
+
+def apply_rewrites(text: str) -> str:
+    """
+    Fix: Function moved to top level for module import.
+    Returns the original text as a value.
+    """
+    return text
 
 
 def chunk_text(text: str, min_words: int = 100, max_words: int = 1000) -> List[str]:
@@ -149,9 +157,6 @@ def chunk_text(text: str, min_words: int = 100, max_words: int = 1000) -> List[s
         chunks.append(merged)
 
     return chunks
-
-    def apply_rewrites(self):
-        pass
 
 
 # ---- MAIN AGENT CLASS ----

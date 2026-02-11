@@ -1,74 +1,123 @@
+# Add these imports at the top
 import os
-import time
-from google import genai
+import asyncio
+import re
 
-# -------------------------------------------------
-# Setup the Gemini Client
-# -------------------------------------------------
-client = genai.Client(
-    api_key=os.environ.get("GEMINI_API_KEY")
-)
+# ... (keep all your existing Bot classes exactly the same)
 
-def audit_logic_path(directory="."):
-    """
-    Traces a specific execution path to find where the '503' catch-all is triggered.
-    """
-    
-    # -------------------------------------------------
-    # PLACEHOLDER: Enter ONE Logic Path at a time here
-    # -------------------------------------------------
-    intended_path = """
-    1. TRIGGER: [Enter the specific UI trigger here]
-    2. PATH: [Describe the sequence of internal function calls]
-    3. INTENDED OUTCOME: [What the code should do if successful]
-    """
-    # -------------------------------------------------
+class MultiBotDebugger:
+    def __init__(self, code_dir: str = '.', logic_intent: str = ''):
+        self.code_dir = code_dir
+        self.logic_intent = logic_intent
+        self.code_files = self._load_code_files()          # now includes HTML/JS
+        self.steps = self._parse_logic_intent()
+        self.fixer = CodeFixerBot()
+        self.tracer = LogicTracerBot()
+        self.optimizer = OptimizerBot()
 
-    py_files = [f for f in os.listdir(directory) if f.endswith('.py')]
-    report_file = "path_audit_report.md"
+    def _load_code_files(self) -> dict:
+        """Load Python, HTML, JS, and CSS files so we can trace full UI→backend paths."""
+        code_files = {}
+        allowed_extensions = {'.py', '.html', '.htm', '.js', '.css'}
+        for root, _, files in os.walk(self.code_dir):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in allowed_extensions:
+                    path = os.path.join(root, file)
+                    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                        code_files[path] = f.read()
+        return code_files
 
-    with open(report_file, "a", encoding="utf-8") as report:
-        report.write(f"\n# Audit Log: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        report.write(f"**Target Path:** {intended_path}\n\n")
+    def _parse_logic_intent(self) -> list:
+        """Same as before, or you can make it smarter later."""
+        steps = re.split(r'\n\s*\d+\.|\n\s*-\s*', self.logic_intent)
+        return [step.strip() for step in steps if step.strip()]
 
-        for py_file in py_files:
-            with open(os.path.join(directory, py_file), "r", encoding="utf-8") as f:
-                code_content = f.read()
-
-            prompt = f"""
-            Follow this specific logic path through the code. 
-            The system returns a '503' error whenever any part of this path fails.
+    async def debug_logic_path(self):
+        print("Starting full-stack multi-bot debug (UI → Backend)...\n")
+        
+        for idx, step in enumerate(self.steps, 1):
+            print(f"Step {idx}: {step}")
             
-            LOGIC PATH:
-            {intended_path}
+            # Find any file that mentions this step (HTML, JS, or Python)
+            relevant_files = [
+                path for path, content in self.code_files.items()
+                if step.lower() in content.lower()
+            ]
             
-            SOURCE CODE ({py_file}):
-            {code_content}
-            
-            TASK:
-            1. Find the trigger in the code.
-            2. Follow the sequence of calls and data transformations line-by-line.
-            3. Pinpoint the EXACT line where the code fails or redirects to that error return.
-            4. If the path is not in this file, return 'Path not found'.
-            """
+            if not relevant_files:
+                print(f"  → Breakpoint: No file contains step '{step}'")
+                continue
 
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=prompt
+            for path in relevant_files:
+                print(f"  → Analyzing: {os.path.basename(path)}")
+                content = self.code_files[path]
+                file_ext = os.path.splitext(path)[1].lower()
+
+                # === Bot 1: Fixer (works on everything) ===
+                fixed_content = self.fixer.fix_code(
+                    content,
+                    issues=[f"UI/backend mismatch in {file_ext}"]
                 )
+                print(f"    Fixed version preview: {fixed_content[:150]}...")
 
-                analysis = response.text.strip()
-                if "Path not found" not in analysis:
-                    report.write(f"### Found in {py_file}:\n{analysis}\n\n")
-                    print(f"Path traced in {py_file}")
+                # === Bot 2: Logic Tracer (now understands UI triggers) ===
+                trace_result = await self.tracer.trace_logic(fixed_content, step, file_ext)
+                print(f"    Trace: {trace_result.get('trace', 'N/A')[:200]}...")
+                if not trace_result.get('can_complete', True):
+                    print(f"    BREAKPOINT DETECTED: {trace_result.get('issues', [])}")
 
-                # THROTTLE: Prevents the API from hitting its own 503 limits
-                time.sleep(5) 
+                # === Bot 3: Optimizer (makes it production-ready) ===
+                optimized = self.optimizer.optimize_code(fixed_content)
+                print(f"    Optimized preview: {optimized[:150]}...\n")
 
-            except Exception as e:
-                print(f"Error scanning {py_file}: {e}")
-                time.sleep(10)
+        print("Full UI-to-endpoint debug session complete.\n")
+        print("You can now copy the optimized code back into your files if you want.")
 
-if __name__ == "__main__":
-    audit_logic_path()
+# === Updated LogicTracerBot to handle HTML/JS ===
+class LogicTracerBot(OpenAIBot):
+    async def trace_logic(self, content: str, step: str, file_ext: str = '.py') -> dict:
+        if file_ext in {'.html', '.htm'}:
+            system_prompt = """
+You are tracing a full user flow from HTML UI to backend endpoint.
+Look for:
+- form action="/some-endpoint"
+- button onclick or data-action
+- fetch/axios calls to backend routes
+- id/class names that match backend logic
+Tell me exactly which backend file/function/endpoint this UI element calls.
+"""
+        elif file_ext == '.js':
+            system_prompt = "Trace JavaScript calls to backend endpoints (fetch, axios, etc.)."
+        else:
+            system_prompt = "Trace Python logic path from trigger to endpoint."
+
+        prompt = f"""
+Step being traced: {step}
+File type: {file_ext}
+
+Content:
+{content[:4000]}  # limit to avoid token explosion
+
+Return JSON:
+{{
+  "trace": "step-by-step flow description",
+  "trigger_element": "which HTML/JS element starts this step",
+  "backend_endpoint": "exact route or function name called",
+  "issues": ["list of problems"],
+  "can_complete": true/false
+}}
+"""
+        response = await self.generate(prompt, system_prompt)
+        try:
+            # safer than eval
+            import json
+            return json.loads(response)
+        except:
+            return {
+                "trace": response,
+                "trigger_element": "unknown",
+                "backend_endpoint": "unknown",
+                "issues": ["Could not parse JSON response"],
+                "can_complete": False
+            }

@@ -1,163 +1,49 @@
-import os
-import sys
-import logging
+# orchestrater.py - Coordinator for the learning loop process
 import asyncio
-import requests
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from bs4 import BeautifulSoup
-from supabase import create_client
+from dotenv import load_dotenv
+import os
+from learning import fetch_text_from_url, handoff_to_rewrites
+from rewrites import process_text_into_packages
+from memory import insert_packages_to_supabase
+from config import supabase  # Assuming config.py has Supabase client
 
-# --- LOGGING & APP CONFIG ---
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("AstraOrchestrator")
+load_dotenv()
 
-app = FastAPI(title="Astra Agent Production Backend")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- STATE MANAGEMENT (Step 22) ---
-class SystemState:
+class Orchestrator:
     def __init__(self):
-        self.held_word_count = 0
+        self.messages = []
+        self.fetched_word_count = 0
+        self.inserted_word_count = 0
 
-state = SystemState()
-
-# --- SCHEMAS ---
-class LearningRequest(BaseModel):
-    url: str
-
-# --- PIPELINE MODULES (Integrated Steps 6-26) ---
-
-async def run_learning_logic(url: str):
-    """Steps 6, 7, 9, 10: Learning retrieval."""
-    try:
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
+    async def start_learning_loop(self, url: str):
+        # Step 4-5: Send URL to learning.py and trigger
+        text, word_count = await fetch_text_from_url(url)
         
-        # Maintain schema: Remove scripts/styles but keep tags for rewrites
-        for element in soup(["script", "style"]):
-            element.extract()
-            
-        plain_text = soup.get_text(separator=' ')
-        word_count = len(plain_text.split())
+        # Step 7-8: Receive message from learning.py and hold
+        self.messages.append(f"Text retrieved: {word_count} words")
+        self.fetched_word_count = word_count
         
-        # Step 7 & 10: Logic signals handoff is ready
-        return {"raw_text": plain_text, "html": response.text, "word_count": word_count}
-    except Exception as e:
-        logger.error(f"Step 6 Error: {e}")
-        raise e
-
-async def run_rewrites_logic(html_content: str):
-    """Steps 12-21: Separation, Summarization, and Packaging."""
-    soup = BeautifulSoup(html_content, 'html.parser')
-    sections = []
-    
-    # Step 12: Separate by schema
-    for header in soup.find_all(['h1', 'h2', 'h3', 'title']):
-        content = []
-        for sibling in header.find_next_siblings():
-            if sibling.name in ['h1', 'h2', 'h3']: break
-            content.append(sibling.get_text())
-        sections.append({"title": header.get_text().strip(), "text": " ".join(content)})
-
-    packages = []
-    total_words = 0
-    valid_tables = ["ai_prompt_engineering_junk", "analytics_junk", "seo_junk", "meta_skills_junk"] # Example subset
-
-    for sec in sections:
-        words = sec["text"].split()
-        if not words: continue
+        # Step 9-10: Handoff to rewrites.py and receive confirmation
+        handoff_success = await handoff_to_rewrites(text)
+        self.messages.append("Handoff to rewrites complete" if handoff_success else "Handoff failed")
         
-        # Step 14-15: 75%+ retention summarization
-        keep_count = max(int(len(words) * 0.8), 1)
-        summarized = " ".join(words[:keep_count])
+        # Step 11: Trigger rewrites.py
+        packages, total_words = await process_text_into_packages(text)
         
-        # Step 17: Package word count constraints
-        pkg_word_count = len(summarized.split())
+        # Step 21-22: Receive from rewrites.py and hold word count
+        self.messages.append(f"Packages passed to memory.py: {total_words} words")
         
-        # Step 16: Table labeling (Simplified keyword match)
-        table_label = "meta_skills_junk"
-        for t in valid_tables:
-            if t.split('_')[0] in sec["title"].lower():
-                table_label = t
-                break
-
-        packages.append({
-            "table": table_label,
-            "content": summarized,
-            "word_count": pkg_word_count
-        })
-        total_words += pkg_word_count
-
-    return {"packages": packages, "total_word_count": total_words}
-
-async def run_memory_logic(packages):
-    """Steps 24-26: Supabase Insertion."""
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_DATA_ROLE_KEY")
-    
-    if not url or not key:
-        logger.warning("Supabase credentials missing. Skipping DB insert.")
-        return True
-
-    supabase = create_client(url, key)
-    
-    for pkg in packages:
-        # Step 25: Insert into labeled table
-        supabase.table(pkg["table"]).insert({
-            "content": pkg["content"], 
-            "word_count": pkg["word_count"]
-        }).execute()
+        # Step 23: Trigger memory.py
+        inserted_count = await insert_packages_to_supabase(packages)
+        self.inserted_word_count = inserted_count
         
-    return True
-
-# --- PRIMARY ENDPOINT ---
-
-@app.post("/learn")
-async def orchestrate_learning(req: LearningRequest):
-    """Steps 3, 4, 5, 8, 11, 22, 23, 27."""
-    try:
-        # Step 4, 5, 6: Trigger Learning
-        learn_data = await run_learning_logic(req.url)
-        fetched_count = learn_data["word_count"]
+        # Step 26: Receive from memory.py
+        self.messages.append("Insertion finished")
         
-        # Step 11: Trigger Rewrites
-        rewrite_data = await run_rewrites_logic(learn_data["html"])
-        
-        # Step 22: Hold onto word count from rewrites
-        state.held_word_count = rewrite_data["total_word_count"]
-        
-        # Step 23: Trigger Memory
-        await run_memory_logic(rewrite_data["packages"])
-        
-        # Step 27: Final UI Message
-        return {
-            "fetched_count": fetched_count,
-            "inserted_count": state.held_word_count,
-            "status": "job complete"
-        }
-    except Exception as e:
-        logger.error(f"Pipeline Failed: {e}")
-        raise HTTPException(status_code=500, detail="Learning loop failed")
+        # Step 27: Send message to UI (simulate or use webhook; for now, return)
+        return f"Fetched word count: {self.fetched_word_count} | Inserted word count: {self.inserted_word_count} | Job complete"
 
-# --- UTILITY ENDPOINTS ---
-
-@app.get("/health")
-async def health():
-    return {"status": "online"}
-
-@app.post("/wake")
-async def wake():
-    return {"status": "online"}
-
+# Example usage (integrate with ui_router.py)
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    orchestrator = Orchestrator()
+    asyncio.run(orchestrator.start_learning_loop("https://example.com"))

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Agent Messaging Dashboard</title>
+
+  <style>
+    :root {
+      --indigo: #3f51b5;
+      --slate-800: #1e293b;
+      --gray-100: #f1f5f9;
+      --gray-200: #e5e7eb;
+      --white: #ffffff;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--slate-800);
+    }
+
+    body {
+      margin: 0;
+      background: var(--gray-100);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar h2 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    #backend-status-light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--danger);
+      transition: background 0.3s ease;
+    }
+
+    .sidebar button {
+      padding: 10px 12px;
+      background: var(--indigo);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      text-align: left;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+
+    .sidebar button:hover {
+      opacity: 0.9;
+    }
+
+    .sidebar button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #astra-agent-root {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .dashboard {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 900px;
+      height: 100%;
+      background: var(--gray-100);
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 16px;
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: white;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      line-height: 1.4;
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message.agent {
+      background: var(--gray-100);
+      align-self: flex-start;
+      border: 1px solid var(--gray-200);
+      color: var(--slate-800);
+    }
+
+    .message.user {
+      background: var(--indigo);
+      color: #fff;
+      align-self: flex-end;
+    }
+
+    .message.system {
+      background: var(--warning);
+      color: var(--white);
+      align-self: center;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .typing-indicator {
+      display: flex;
+      gap: 5px;
+      padding: 12px 14px;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      width: fit-content;
+      align-self: flex-start;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: var(--slate-800);
+      border-radius: 50%;
+      opacity: 0.6;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
+      30% { transform: translateY(-10px); opacity: 1; }
+    }
+
+    .input-area {
+      padding: 16px;
+      background: var(--white);
+      border-top: 1px solid var(--gray-200);
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 4px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .input-area button {
+      padding: 10px 20px;
+      background: var(--indigo);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .input-area button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="sidebar">
+    <h2>Agent Controls</h2>
+
+    <div class="status-container">
+      <div id="backend-status-light"></div>
+      <span id="status-text">System Offline</span>
+    </div>
+
+    <button onclick="wakeAgentServer()">Wake Agent Server</button>
+    <button onclick="wakeGenServer()">Wake Gen Server</button>
+    <button onclick="approve()">Approve</button>
+    <button onclick="commit()">Commit</button>
+    <button onclick="promptAgent()">Prompt Agent</button>
+    <button onclick="startLearnLoop()">Start Learn Loop</button>
+  </div>
+
+  <div id="astra-agent-root">
+    <div class="dashboard">
+      <div class="chat-header">AI Brain Interface</div>
+      <div class="messages" id="messages"></div>
+      <div class="input-area">
+        <input id="userInput" type="text" placeholder="Send a message..." autofocus />
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============= CONFIGURATION =============
+    // UPDATE THIS to your Render URL once deployed
+    const ROUTER_URL = "https://askdale-router.onrender.com/api";
+    
+    // Or keep using your current backend if you want:
+    // const BASE_URL = "https://ask-dale.onrender.com";
+
+    // ============= STATE =============
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusLight = document.getElementById("backend-status-light");
+    const statusText = document.getElementById("status-text");
+
+    let currentConversationId = null;
+    let isProcessing = false;
+
+    // ============= HELPER FUNCTIONS =============
+
+    function addMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = `message ${sender}`;
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      const indicator = document.createElement('div');
+      indicator.id = 'typing-indicator';
+      indicator.className = 'typing-indicator';
+      indicator.innerHTML = '<span></span><span></span><span></span>';
+      messagesEl.appendChild(indicator);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function hideTypingIndicator() {
+      const indicator = document.getElementById('typing-indicator');
+      if (indicator) indicator.remove();
+    }
+
+    async function callRouter(endpoint, data = {}) {
+      try {
+        const res = await fetch(`${ROUTER_URL}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        return await res.json();
+      } catch (err) {
+        console.error(`Error calling ${endpoint}:`, err);
+        return {
+          success: false,
+          error: err.message
+        };
+      }
+    }
+
+    // ============= CHAT FUNCTIONS =============
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text || isProcessing) return;
+
+      isProcessing = true;
+      addMessage(text, "user");
+      inputEl.value = "";
+      
+      // Disable input while processing
+      inputEl.disabled = true;
+      sendBtn.disabled = true;
+
+      showTypingIndicator();
+
+      try {
+        const result = await callRouter('/conversation', {
+          message: text,
+          conversation_id: currentConversationId
+        });
+
+        hideTypingIndicator();
+
+        if (result.success) {
+          // Store conversation ID
+          if (result.conversation_id) {
+            currentConversationId = result.conversation_id;
+          }
+          
+          // Display agent response
+          if (result.response) {
+            addMessage(result.response, "agent");
+          }
+        } else {
+          addMessage(`Error: ${result.error}`, "system");
+        }
+
+      } catch (err) {
+        hideTypingIndicator();
+        addMessage("Connection error: Backend may be sleeping.", "agent");
+      }
+
+      // Re-enable input
+      inputEl.disabled = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+      isProcessing = false;
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    inputEl.addEventListener("keypress", e => { 
+      if (e.key === "Enter") sendMessage(); 
+    });
+
+    // ============= SIDEBAR CONTROL FUNCTIONS =============
+
+    async function wakeAgentServer() {
+      addMessage("Waking agent server...", "system");
+      
+      const result = await callRouter('/wake-agent-server');
+      
+      if (result.success) {
+        addMessage("✓ Agent server is online", "system");
+        checkStatus();
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    async function wakeGenServer() {
+      addMessage("Waking generation server...", "system");
+      
+      const result = await callRouter('/wake-gen-server');
+      
+      if (result.success) {
+        addMessage("✓ Generation server is online", "system");
+        checkStatus();
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    async function approve() {
+      addMessage("Sending approval...", "system");
+      
+      const result = await callRouter('/approve');
+      
+      if (result.success) {
+        addMessage("✓ Approval sent", "system");
+        if (result.message) {
+          addMessage(result.message, "agent");
+        }
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    async function commit() {
+      const commitMessage = prompt('Enter commit message (optional):') || 'UI commit';
+      
+      addMessage("Committing changes...", "system");
+      
+      const result = await callRouter('/commit', {
+        message: commitMessage
+      });
+      
+      if (result.success) {
+        addMessage("✓ Changes committed", "system");
+        if (result.message) {
+          addMessage(result.message, "agent");
+        }
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    async function promptAgent() {
+      const prompt = window.prompt('Enter prompt for the agent:');
+      
+      if (!prompt) {
+        addMessage("Prompt cancelled", "system");
+        return;
+      }
+      
+      addMessage(`Prompt: ${prompt}`, "user");
+      showTypingIndicator();
+      
+      const result = await callRouter('/prompt-agent', {
+        prompt: prompt
+      });
+      
+      hideTypingIndicator();
+      
+      if (result.success) {
+        addMessage("✓ Prompt sent", "system");
+        if (result.response) {
+          addMessage(result.response, "agent");
+        }
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    async function startLearnLoop() {
+      addMessage("Starting learning loop...", "system");
+      
+      const result = await callRouter('/start-learn-loop');
+      
+      if (result.success) {
+        addMessage("✓ Learning loop started", "system");
+        checkStatus();
+      } else {
+        addMessage(`✗ Failed: ${result.error}`, "system");
+      }
+    }
+
+    // ============= STATUS POLLING =============
+
+    async function checkStatus() {
+      try {
+        const res = await fetch(`${ROUTER_URL}/status`);
+        const data = await res.json();
+
+        if (data.success) {
+          const allOnline = data.servers.agent_server || data.servers.gen_server;
+          
+          if (allOnline) {
+            statusLight.style.background = "var(--success)";
+            statusText.textContent = "System Online";
+          } else {
+            statusLight.style.background = "var(--warning)";
+            statusText.textContent = "Servers Sleeping";
+          }
+        }
+      } catch (err) {
+        statusLight.style.background = "var(--danger)";
+        statusText.textContent = "Router Offline";
+      }
+    }
+
+    // Check status every 10 seconds
+    setInterval(checkStatus, 10000);
+    checkStatus();
+
+    // Welcome message
+    addMessage("Welcome to Ask Dale AI. Start a conversation below.", "system");
+  </script>
+</body>
+</html

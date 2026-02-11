@@ -1,13 +1,6 @@
 # memory.py - Inserts packages into Supabase
 import asyncio
-from supabase import create_client
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+from config import supabase  # Shared client
 
 async def insert_packages_to_supabase(packages: list) -> int:
     inserted_words = 0
@@ -15,14 +8,17 @@ async def insert_packages_to_supabase(packages: list) -> int:
         table = package["table"]
         data = {
             "content": package["content"],
-            "word_count": package["word_count"],
-            # Add other fields as needed, e.g., source_url, timestamp
+            "word_count": package["word_count"]
+            # Add: "source_url": url, "inserted_at": now() if needed in table schema
         }
-        response = supabase.table(table).insert(data).execute()
-        if response.data:
-            inserted_words += package["word_count"]
-        else:
-            raise ValueError(f"Insert failed for {table}")
+        try:
+            response = supabase.table(table).insert(data).execute()
+            if response.data:
+                inserted_words += package["word_count"]
+            else:
+                raise ValueError(f"Insert failed for {table}: {response.error}")
+        except Exception as e:
+            raise ValueError(f"Supabase insert error: {str(e)}")
     
-    # Step 26: Tell orchestrator finished (via return)
+    # Step 26: Return inserted count for orchestrator
     return inserted_words

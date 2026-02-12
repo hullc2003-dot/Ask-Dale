@@ -367,138 +367,63 @@
       if (e.key === "Enter") sendMessage(); 
     });
 
-    // ============= SIDEBAR CONTROL FUNCTIONS =============
+    <script>
+  // ... (keep CONFIGURATION, STATE, HELPER FUNCTIONS, CHAT FUNCTIONS unchanged)
 
-    async function wakeAgentServer() {
-      addMessage("Waking agent server...", "system");
-      
-      const result = await callRouter('/wake-agent-server');
-      
-      if (result.success) {
-        addMessage("✓ Agent server is online", "system");
-        checkStatus();
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
-      }
+  // ============= SIDEBAR CONTROL FUNCTIONS =============
+
+  async function wakeAgentServer() {
+    addMessage("Waking agent server...", "system");
+    
+    const result = await callRouter('/wake-agent-server', {}, 'GET'); // Added 'GET' param
+    
+    if (result.success) {
+      addMessage("✓ Agent server is online", "system");
+      checkStatus();
+    } else {
+      addMessage(`✗ Failed: ${result.error}`, "system");
     }
+  }
 
-    async function wakeGenServer() {
-      addMessage("Waking generation server...", "system");
-      
-      const result = await callRouter('/wake-gen-server');
-      
-      if (result.success) {
-        addMessage("✓ Generation server is online", "system");
-        checkStatus();
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
-      }
+  async function wakeGenServer() {
+    addMessage("Waking generation server...", "system");
+    
+    const result = await callRouter('/wake-gen-server', {}, 'GET');
+    
+    if (result.success) {
+      addMessage("✓ Generation server is online", "system");
+      checkStatus();
+    } else {
+      addMessage(`✗ Failed: ${result.error}`, "system");
     }
+  }
 
-    async function approve() {
-      addMessage("Sending approval...", "system");
-      
-      const result = await callRouter('/approve');
-      
-      if (result.success) {
-        addMessage("✓ Approval sent", "system");
-        if (result.message) {
-          addMessage(result.message, "agent");
-        }
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
-      }
-    }
+  // ... (keep approve, commit, promptAgent, startLearnLoop unchanged)
 
-    async function commit() {
-      const commitMessage = prompt('Enter commit message (optional):') || 'UI commit';
-      
-      addMessage("Committing changes...", "system");
-      
-      const result = await callRouter('/commit', {
-        message: commitMessage
+  // Update callRouter to support method param (default POST)
+  async function callRouter(endpoint, data = {}, method = 'POST') {
+    try {
+      const res = await fetch(`${ROUTER_URL}${endpoint}`, {
+        method: method, // Now dynamic
+        headers: method === 'POST' ? { "Content-Type": "application/json" } : {}, // Only for POST
+        body: method === 'POST' ? JSON.stringify(data) : null
       });
-      
-      if (result.success) {
-        addMessage("✓ Changes committed", "system");
-        if (result.message) {
-          addMessage(result.message, "agent");
-        }
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       }
+
+      return await res.json();
+    } catch (err) {
+      console.error(`Error calling ${endpoint}:`, err);
+      return {
+        success: false,
+        error: err.message
+      };
     }
+  }
 
-    async function promptAgent() {
-      const prompt = window.prompt('Enter prompt for the agent:');
-      
-      if (!prompt) {
-        addMessage("Prompt cancelled", "system");
-        return;
-      }
-      
-      addMessage(`Prompt: ${prompt}`, "user");
-      showTypingIndicator();
-      
-      const result = await callRouter('/prompt-agent', {
-        prompt: prompt
-      });
-      
-      hideTypingIndicator();
-      
-      if (result.success) {
-        addMessage("✓ Prompt sent", "system");
-        if (result.response) {
-          addMessage(result.response, "agent");
-        }
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
-      }
-    }
-
-    async function startLearnLoop() {
-      addMessage("Starting learning loop...", "system");
-      
-      const result = await callRouter('/start-learn-loop');
-      
-      if (result.success) {
-        addMessage("✓ Learning loop started", "system");
-        checkStatus();
-      } else {
-        addMessage(`✗ Failed: ${result.error}`, "system");
-      }
-    }
-
-    // ============= STATUS POLLING =============
-
-    async function checkStatus() {
-      try {
-        const res = await fetch(`${ROUTER_URL}/status`);
-        const data = await res.json();
-
-        if (data.success) {
-          const allOnline = data.servers.agent_server || data.servers.gen_server;
-          
-          if (allOnline) {
-            statusLight.style.background = "var(--success)";
-            statusText.textContent = "System Online";
-          } else {
-            statusLight.style.background = "var(--warning)";
-            statusText.textContent = "Servers Sleeping";
-          }
-        }
-      } catch (err) {
-        statusLight.style.background = "var(--danger)";
-        statusText.textContent = "Router Offline";
-      }
-    }
-
-    // Check status every 10 seconds
-    setInterval(checkStatus, 10000);
-    checkStatus();
-
-    // Welcome message
-    addMessage("Welcome to Ask Dale AI. Start a conversation below.", "system");
-  </script>
+  // ... (keep STATUS POLLING and welcome message unchanged)
+</script>
 </body>
 </html

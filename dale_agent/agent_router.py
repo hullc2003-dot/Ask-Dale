@@ -11,7 +11,7 @@ from junk_drawer_processor import normalize_input
 from gap_analyzer import analyze_gaps
 from improvement_engine import propose_improvements
 from feedback_memory import write_feedback_memory
-from strategy_writer import write_content
+from strategy_writer import StrategyWriter
 
 # Provider / DB access should be centralized
 from provider import get_supabase_client

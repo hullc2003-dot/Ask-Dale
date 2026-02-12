@@ -4,8 +4,6 @@ import os
 import asyncio
 from typing import Any
 from dotenv import load_dotenv
-import os
-import time
 from google import genai
 
     client = genai.Client(

@@ -2,113 +2,202 @@ from __future__ import annotations
 
 import os
 import asyncio
-from typing import Any
+import time
+from typing import Optional
 from dotenv import load_dotenv
 from google import genai
+from google.genai.types import GenerateContentConfig
 
-    client = genai.Client(
-    api_key=os.environ.get("GEMINI_API_KEY")
-)
+
+# ==============================
+# Environment Setup
+# ==============================
+
 load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise EnvironmentError("GEMINI_API_KEY not found in environment variables.")
+
+# Gemini client (single global instance)
+client = genai.Client(api_key=GEMINI_API_KEY)
+
+
+# ==============================
+# Strategy Writer
+# ==============================
 
 class StrategyWriter:
     """
-    Generates a highly detailed, accurate, reliable strategy for becoming a self-improving agentic AI.
-    Produces 10 steps at a time in agent-readable Markdown format.
-    Uses tightly constrained prompts to ensure no LLM straying or hallucinations.
-    Stores and appends to a local MD file ('agent_strategy.md') for the current plan version.
-    This serves as the dependable plan foundation—wired for production use.
-    
-    Inject your LLM client (e.g., Groq for speed) when instantiating.
+    Production-ready Gemini strategy generator.
+
+    - Uses Gemini only
+    - Throttled for Google free tier safety
+    - Strict 10-step chunk enforcement
+    - Persistent markdown storage
+    - Bounded retry logic
     """
 
-    def __init__(self, llm_client: AsyncOpenAI):
-        self.llm = llm_client
-        self.plan_file = "agent_strategy.md"  # Local MD file for persistent, reliable storage
-        self.current_step = 0  # Tracks progress for sequential, non-overlapping chunks
+    # ---- Free tier throttle settings ----
+    MIN_SECONDS_BETWEEN_CALLS = 20  # Safe cushion for free tier
+    MAX_RETRIES = 2                 # Prevent infinite recursion
+
+    def __init__(self, plan_file: str = "agent_strategy.md"):
+        self.plan_file = plan_file
+        self.current_step = self._infer_current_step()
+        self._last_call_time: Optional[float] = None
+
+    # ==============================
+    # Public Method
+    # ==============================
 
     async def generate_strategy_chunk(self) -> str:
         """
-        Generates the next 10 steps of the strategy with a solid, anti-stray prompt.
-        Appends to the local MD file for reliability.
-        Returns the chunk for immediate use or UI display.
-        Handles errors with retries for production stability.
+        Generates exactly 10 new strategy steps.
+        Applies throttle + validation + bounded retry.
         """
+
+        await self._throttle()
+
         context = self._load_current_plan()
 
-        # Solid, constrained prompt: Mission-locked, structured, no room for deviation
         prompt = f"""
-        Generate a highly detailed, accurate strategy for an agentic AI to become self-improving.
-        Output EXACTLY the next 10 steps (steps {self.current_step + 1} to {self.current_step + 10}).
-        Base strictly on human brain mechanics: modular, layered learning with fanatic mission obsession.
-        Each step MUST use this EXACT structure—no additions or omissions:
-        - **Step N**: Title (1 clear sentence).
-        - **Description**: 1-2 paragraphs, detailed, concise, mission-focused.
-        - **Exact Knowledge**: Bullet checklist of locked-in facts (5-10 items, factual only).
-        - **Logic Flow**: Decision tree (numbered branches with fail-safes, no ambiguity).
-        - **Procedures**: Numbered steps (5-8, with explicit checkpoints).
-        Align EVERY element to the mission: Transform dale_agent into a agentic ai agent ai engineer that specializes in building itself to be the best design builder of agentic ai agents.  
-        Do NOT repeat previous steps. Do NOT add intros, outros, extras, or opinions. Do NOT stray—focus on self-improvement bootstrap.
-        Output in clean Markdown only. If context is empty, start from absolute basics.
+Generate a highly detailed, accurate strategy for an agentic AI to become self-improving.
 
-        Current plan context (build sequentially on this, no repetition): {context[:4000]}... (truncated for precision)
+Output EXACTLY the next 10 steps (steps {self.current_step + 1} to {self.current_step + 10}).
+
+Base strictly on human brain mechanics: modular, layered learning with fanatic mission obsession.
+
+Each step MUST use this EXACT structure:
+
+- **Step N**: Title (1 clear sentence).
+- **Description**: 1-2 paragraphs, detailed, concise, mission-focused.
+- **Exact Knowledge**: Bullet checklist of locked-in facts (5-10 items, factual only).
+- **Logic Flow**: Decision tree (numbered branches with fail-safes, no ambiguity).
+- **Procedures**: Numbered steps (5-8, with explicit checkpoints).
+
+Align EVERY element to the mission:
+Transform dale_agent into an agentic AI engineer that specializes in building itself to be the best designer-builder of agentic AI agents.
+
+Do NOT repeat previous steps.
+Do NOT add intros, outros, commentary, or opinions.
+Output clean Markdown only.
+
+Current plan context:
+{context[:4000]}
+"""
+
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=prompt,
+                    config=GenerateContentConfig(
+                        temperature=0.1,
+                        top_p=0.8,
+                        max_output_tokens=3500,
+                    )
+                )
+
+                chunk = response.text.strip()
+
+                if not self._validate_chunk(chunk):
+                    raise ValueError("Output structure invalid.")
+
+                self._append_to_plan(chunk)
+                self.current_step += 10
+
+                self._last_call_time = time.time()
+
+                return chunk
+
+            except Exception as e:
+                if attempt >= self.MAX_RETRIES:
+                    raise RuntimeError(f"Strategy generation failed after retries: {str(e)}")
+                await asyncio.sleep(3)
+
+        raise RuntimeError("Unexpected failure in generate_strategy_chunk.")
+
+    # ==============================
+    # Internal Helpers
+    # ==============================
+
+    async def _throttle(self):
+        """
+        Ensures safe spacing between API calls.
+        Designed to remain well within Gemini free tier.
         """
 
-        try:
-            response = await self.llm.chat.completions.create(
-                model="mixtral-8x7b-32768",  # Reliable Groq model; swap if needed
-                messages=[
-                    {"role": "system", "content": "You are a precise, constrained strategy generator. Follow instructions exactly—no deviations, no creativity outside bounds."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=4000,  # Sufficient for detail
-                temperature=0.1,  # Ultra-low for factual, non-straying output
-                top_p=0.8,  # Constrains to high-probability, reliable responses
-            )
-            chunk = response.choices[0].message.content.strip()
+        if self._last_call_time is None:
+            return
 
-            # Validate chunk (basic check for structure adherence)
-            if not chunk.startswith('**Step') or chunk.count('**Step') != 10:
-                raise ValueError("Chunk does not follow exact 10-step structure—retrying.")
+        elapsed = time.time() - self._last_call_time
+        if elapsed < self.MIN_SECONDS_BETWEEN_CALLS:
+            wait_time = self.MIN_SECONDS_BETWEEN_CALLS - elapsed
+            await asyncio.sleep(wait_time)
 
-            # Append to MD file
-            self._append_to_plan(chunk)
+    def _validate_chunk(self, chunk: str) -> bool:
+        """
+        Validates that exactly 10 steps are present.
+        """
 
-            # Advance tracker
-            self.current_step += 10
+        step_count = chunk.count("**Step")
+        if step_count != 10:
+            return False
 
-            return chunk
-        except Exception as e:
-            # Retry once for reliability (e.g., API flake)
-            print(f"Error: {str(e)}—retrying once.")
-            await asyncio.sleep(2)  # Brief backoff
-            return await self.generate_strategy_chunk()  # Recursive retry (limit 1)
+        if not chunk.strip().startswith("**Step"):
+            return False
+
+        return True
 
     def _load_current_plan(self) -> str:
-        """Loads existing plan from MD file for context continuity."""
+        """
+        Loads existing markdown plan.
+        """
+
         if os.path.exists(self.plan_file):
-            with open(self.plan_file, 'r') as f:
+            with open(self.plan_file, "r", encoding="utf-8") as f:
                 return f.read()
+
         return "No prior plan—initialize from basics."
 
     def _append_to_plan(self, chunk: str):
-        """Appends chunk to MD file, creating if needed."""
-        mode = 'a' if os.path.exists(self.plan_file) else 'w'
-        with open(self.plan_file, mode) as f:
-            if mode == 'w':
+        """
+        Appends new chunk to markdown file.
+        """
+
+        file_exists = os.path.exists(self.plan_file)
+
+        with open(self.plan_file, "a", encoding="utf-8") as f:
+            if not file_exists:
                 f.write("# Agentic AI Self-Improvement Strategy Plan\n\n")
             f.write(chunk + "\n\n")
 
-# Example Usage (integrate with router/maestro for triggering)
-async def test_strategy_writer():
-    # Wire in Groq client (solid for speed/reliability)
-    client = AsyncOpenAI(
-        api_key=os.getenv("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1"
-    )
-    writer = StrategyWriter(client)
+    def _infer_current_step(self) -> int:
+        """
+        Infers current step number from existing file.
+        Ensures continuation without duplication.
+        """
+
+        if not os.path.exists(self.plan_file):
+            return 0
+
+        with open(self.plan_file, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        return content.count("**Step")
+
+
+# ==============================
+# Example Runner
+# ==============================
+
+async def main():
+    writer = StrategyWriter()
     chunk = await writer.generate_strategy_chunk()
+    print("\n===== GENERATED STRATEGY CHUNK =====\n")
     print(chunk)
 
+
 if __name__ == "__main__":
-    asyncio.run(test_strategy_writer())
+    asyncio.run(main())

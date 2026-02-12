@@ -1,6 +1,7 @@
 class ContentWriter:
     """
-    Writes a 1500‑word digital nomad affiliate marketing article.
+    writes a plan on the first ten steps it will take to become 
+    self improving agentic ai. 
 
     You inject your LLM client when you instantiate this class.
     """

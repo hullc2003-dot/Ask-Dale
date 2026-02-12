@@ -16,7 +16,7 @@ class StrategyWriter:
     Stores and appends to a local MD file ('agent_strategy.md') for the current plan version.
     This serves as the dependable plan foundation—wired for production use.
     
-    Inject your LLM client (e.g., Groq for speed/cost) when instantiating.
+    Inject your LLM client (e.g., Groq for speed) when instantiating.
     """
 
     def __init__(self, llm_client: AsyncOpenAI):
@@ -89,7 +89,7 @@ class StrategyWriter:
         return "No prior plan—initialize from basics."
 
     def _append_to_plan(self, chunk: str):
-        """Appends chunk to MD file reliably, creating if needed."""
+        """Appends chunk to MD file, creating if needed."""
         mode = 'a' if os.path.exists(self.plan_file) else 'w'
         with open(self.plan_file, mode) as f:
             if mode == 'w':

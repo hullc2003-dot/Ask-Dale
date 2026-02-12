@@ -3,9 +3,14 @@ from __future__ import annotations
 import os
 import asyncio
 from typing import Any
-from openai import AsyncOpenAI  # Groq/OpenAI-compatible client for reliability
 from dotenv import load_dotenv
+import os
+import time
+from google import genai
 
+    client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY")
+)
 load_dotenv()
 
 class StrategyWriter:

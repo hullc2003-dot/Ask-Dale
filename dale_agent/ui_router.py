@@ -1,499 +1,361 @@
-from **future** import annotations
-
-import uuid
-import datetime
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import logging
-import re
-from typing import Dict, Any, Optional
-from collections import defaultdict
-import time
+import os
+import requests
 
-# Setup logging
+# Direct import from agent_router (same deployment)
 
-logging.basicConfig(level=logging.INFO)
+try:
+from agent_router import process_prompt  # Must exist in agent_router.py
+except ImportError as e:
+logging.error(f”Failed to import agent_router: {e}”)
+logging.error(“Ensure agent_router.py exists with process_prompt function”)
+raise
+
+app = Flask(**name**)
+
+# CORS configuration
+
+allowed_origins = os.getenv(“CORS_ORIGINS”, “*”)
+CORS(app, origins=allowed_origins.split(”,”) if allowed_origins != “*” else “*”)
+
+# Logging: accurate, timestamped, file + console
+
+logging.basicConfig(
+level=logging.INFO,
+format=’%(asctime)s [%(levelname)s] %(message)s’,
+handlers=[
+logging.FileHandler(“ui_events.log”),
+logging.StreamHandler()
+]
+)
 logger = logging.getLogger(**name**)
 
-# Core imports with validation
+def handle_agent_response(result: dict, conversation_id: str = None) -> tuple:
+“””
+Handle agent router response with proper status codes and logging.
 
-try:
-from config import settings
-from dale import run_agent
-from junk_drawer_processor import normalize_input
-from gap_analyzer import analyze_gaps
-from improvement_engine import propose_improvements
-from feedback_memory import write_feedback_memory
-from strategy_writer import StrategyWriter
-from provider import get_supabase_client
-IMPORTS_OK = True
-except ImportError as e:
-logger.error(f”Failed to import dependencies: {e}”)
-IMPORTS_OK = False
-
-# Router state with cleanup
-
-PENDING_APPROVAL: Dict[str, Dict[str, Any]] = {}
-APPROVAL_TIMEOUT = 3600  # 1 hour in seconds
-REQUEST_COUNTS = defaultdict(list)
-RATE_LIMIT = 30  # requests per minute
-
-# Button → Intent mapping (lowercase keys)
-
-BUTTON_INTENTS = {
-“wake”: “wake”,
-“agent”: “agent”,
-“server”: “server”,
-“wake gen”: “wake_gen”,
-“approve”: “approve”,
-“commit”: “commit”,
-“prompt agent”: “prompt”,
-“start learn”: “learn”,
+```
+Agent router returns:
+{
+    "status": "success" | "error" | "pending",
+    "data": {...},
+    "message": str (optional)
 }
 
-def check_rate_limit(user_id: str) -> bool:
-“”“Rate limiting: max RATE_LIMIT requests per minute per user.”””
-now = time.time()
-# Remove requests older than 1 minute
-REQUEST_COUNTS[user_id] = [
-t for t in REQUEST_COUNTS[user_id]
-if now - t < 60
-]
-
-```
-if len(REQUEST_COUNTS[user_id]) >= RATE_LIMIT:
-    return False
-
-REQUEST_COUNTS[user_id].append(now)
-return True
-```
-
-def clean_expired_approvals():
-“”“Remove approvals older than APPROVAL_TIMEOUT.”””
-now = datetime.datetime.utcnow()
-expired = [
-aid for aid, data in PENDING_APPROVAL.items()
-if (now - data.get(“created_at”, now)).seconds > APPROVAL_TIMEOUT
-]
-for aid in expired:
-logger.info(f”Cleaning expired approval: {aid}”)
-del PENDING_APPROVAL[aid]
-
-def validate_agent_response(response: Any) -> tuple[bool, str]:
-“”“Validate that agent response is usable.”””
-if response is None:
-return False, “Agent returned None”
-if isinstance(response, str) and not response.strip():
-return False, “Agent returned empty response”
-if len(str(response)) > 100000:  # 100KB limit
-return False, “Response too large (>100KB)”
-return True, “”
-
-def detect_intent(message: str) -> str:
-“””
-Detect user intent with priority:
-1. Exact commands (highest priority)
-2. Special patterns
-3. Keyword matches (most permissive)
-“””
-# Priority 1: Exact commands
-if message in [”!wake”, “!agent”, “!server”, “!learn”]:
-return message[1:]
-
-```
-# Priority 2: Special patterns
-if re.search(r'\b(run|execute)\s+strategy', message):
-    return "strategy"
-
-if re.search(r'\bstart\s+learn', message):
-    return "learn"
-
-# Check for approve/commit with ID (any alphanumeric+dash+underscore)
-# These need exact matching to avoid conversation conflicts
-if re.match(r'^approve\s+[\w\-]+$', message.strip()):
-    return "approve"
-
-if re.match(r'^commit\s+[\w\-]+$', message.strip()):
-    return "commit"
-
-# Priority 3: Button keyword matches (word boundaries)
-# Skip approve/commit here since they're handled above
-for keyword, intent in BUTTON_INTENTS.items():
-    if intent not in ['approve', 'commit']:  # Skip these
-        if re.search(rf'\b{re.escape(keyword)}\b', message):
-            return intent
-
-# Default: conversation
-return "conversation"
-```
-
-def process_prompt(message: str, conversation_id: Optional[str] = None) -> Dict[str, Any]:
-“””
-Single entry point - always returns valid dict.
-Called directly from ui_router.py
-
-```
-Returns:
-    {
-        "status": "success" | "error" | "pending",
-        "data": {...},
-        "message": str (optional)
-    }
+Returns: (response_dict, status_code)
 """
-request_id = str(uuid.uuid4())[:8]
-logger.info(f"[{request_id}] Processing message: {message[:100]}...")
+status = result.get('status', 'error')
+data = result.get('data', {})
+message = result.get('message', '')
 
-# Check dependencies
-if not IMPORTS_OK:
-    logger.error(f"[{request_id}] Dependencies not loaded")
-    return {
-        "status": "error",
-        "message": "System dependencies not available",
-        "data": {}
-    }
+# Log the response
+session_label = conversation_id or 'anonymous'
+logger.info(f"[{session_label}] Response status: {status}")
 
-try:
-    # Rate limiting
-    user_id = conversation_id or "anonymous"
-    if not check_rate_limit(user_id):
-        logger.warning(f"[{request_id}] Rate limit exceeded for {user_id}")
-        return {
-            "status": "error",
-            "message": "Rate limit exceeded. Please wait a minute.",
-            "data": {}
-        }
+if status == 'success':
+    # Log successful response summary
+    response_preview = str(data.get('result', 'N/A'))[:100]
+    logger.info(f"[{session_label}] Response: {response_preview}...")
     
-    # Normalize input
-    try:
-        message = normalize_input(message.lower().strip())
-    except Exception as e:
-        logger.error(f"[{request_id}] normalize_input failed: {e}")
-        message = message.lower().strip()  # Fallback
+    # For backward compatibility, return just the data portion
+    return data, 200
     
-    # Detect intent
-    intent = detect_intent(message)
-    logger.info(f"[{request_id}] Detected intent: {intent}")
+elif status == 'pending':
+    # Learning loop approval pending
+    logger.info(f"[{session_label}] Pending approval: {data.get('approval_id')}")
+    return result, 202  # 202 Accepted
     
-    # Route by intent
-    result = _route_intent(intent, message, conversation_id, request_id)
+elif status == 'error':
+    # Log the specific error
+    logger.error(f"[{session_label}] Error: {message}")
     
-    logger.info(f"[{request_id}] Result status: {result['status']}")
-    return result
-    
-except Exception as e:
-    logger.exception(f"[{request_id}] Unhandled exception in process_prompt")
-    return {
-        "status": "error",
-        "message": f"Internal error: {str(e)}",
-        "data": {}
-    }
-```
-
-def _route_intent(
-intent: str,
-message: str,
-conversation_id: Optional[str],
-request_id: str
-) -> Dict[str, Any]:
-“”“Route to appropriate handler based on intent.”””
-
-```
-# Simple status intents (no DB needed)
-if intent == "wake":
-    return {
-        "status": "success",
-        "data": {"result": "Agent initialized and ready."},
-        "message": "Agent is ready"
-    }
-
-if intent == "server":
-    return {
-        "status": "success",
-        "data": {
-            "result": "Server alive",
-            "timestamp": _now(),
-            "request_id": request_id
-        }
-    }
-
-if intent == "wake_gen":
-    try:
-        run_agent("ping")
-        return {
-            "status": "success",
-            "data": {"result": "Generation server awake."}
-        }
-    except Exception as e:
-        logger.error(f"[{request_id}] wake_gen failed: {e}")
-        return {
-            "status": "error",
-            "message": f"Failed to wake generation server: {str(e)}",
-            "data": {}
-        }
-
-# Strategy intent
-if intent == "strategy":
-    try:
-        writer = StrategyWriter()
-        output = writer.run()
-        return {
-            "status": "success",
-            "data": {
-                "result": f"Strategy chunk generated:\n{str(output)}"
-            }
-        }
-    except Exception as e:
-        logger.exception(f"[{request_id}] Strategy generation failed")
-        return {
-            "status": "error",
-            "message": f"Strategy generation failed: {str(e)}",
-            "data": {}
-        }
-
-# Agent intents (with validation)
-if intent in {"agent", "prompt"}:
-    try:
-        response = run_agent(message)
-        valid, error_msg = validate_agent_response(response)
-        if not valid:
-            logger.warning(f"[{request_id}] Invalid agent response: {error_msg}")
-            return {
-                "status": "error",
-                "message": error_msg,
-                "data": {}
-            }
-        return {
-            "status": "success",
-            "data": {"result": response}
-        }
-    except TimeoutError:
-        logger.error(f"[{request_id}] Agent timeout")
-        return {
-            "status": "error",
-            "message": "Agent request timed out",
-            "data": {}
-        }
-    except Exception as e:
-        logger.exception(f"[{request_id}] Agent call failed")
-        return {
-            "status": "error",
-            "message": f"Agent error: {str(e)}",
-            "data": {}
-        }
-
-# Conversation intent (with DB)
-if intent == "conversation":
-    try:
-        # Get agent response
-        response = run_agent(message)
-        valid, error_msg = validate_agent_response(response)
-        if not valid:
-            logger.warning(f"[{request_id}] Invalid conversation response: {error_msg}")
-            return {
-                "status": "error",
-                "message": error_msg,
-                "data": {}
-            }
-        
-        # Write to memory (with error handling)
-        supabase = get_supabase_client()
-        memory_ok = _write_conversation_memory(
-            supabase=supabase,
-            session_id=conversation_id or str(uuid.uuid4()),
-            user_message=message,
-            agent_response=response,
-            request_id=request_id
-        )
-        
-        return {
-            "status": "success",
-            "data": {
-                "result": response,
-                "memory_written": memory_ok
-            }
-        }
-    except Exception as e:
-        logger.exception(f"[{request_id}] Conversation handling failed")
-        return {
-            "status": "error",
-            "message": f"Conversation error: {str(e)}",
-            "data": {}
-        }
-
-# Learning loop intents
-if intent == "learn":
-    clean_expired_approvals()
-    try:
-        gaps = analyze_gaps()
-        proposal = propose_improvements(gaps)
-        
-        approval_id = str(uuid.uuid4())
-        PENDING_APPROVAL[approval_id] = {
-            **proposal,
-            "created_at": datetime.datetime.utcnow(),
-            "user_id": conversation_id or "anonymous",
-            "approved": False
-        }
-        
-        logger.info(f"[{request_id}] Created approval: {approval_id}")
-        return {
-            "status": "pending",
-            "data": {
-                "approval_id": approval_id,
-                "proposal": proposal
-            },
-            "message": "Review and approve to commit changes"
-        }
-    except Exception as e:
-        logger.exception(f"[{request_id}] Learn loop failed")
-        return {
-            "status": "error",
-            "message": f"Learning analysis failed: {str(e)}",
-            "data": {}
-        }
-
-if intent == "approve":
-    clean_expired_approvals()
-    # Extract approval ID from message
-    match = re.search(r'approve\s+([\w\-]+)', message.strip())
-    if not match:
-        return {
-            "status": "error",
-            "message": "Invalid approval command format. Use: approve <approval_id>",
-            "data": {}
-        }
-    
-    approval_id = match.group(1)
-    
-    if approval_id not in PENDING_APPROVAL:
-        return {
-            "status": "error",
-            "message": "Invalid or expired approval ID",
-            "data": {}
-        }
-    
-    # Check user authorization
-    stored_user = PENDING_APPROVAL[approval_id].get("user_id")
-    if stored_user != (conversation_id or "anonymous"):
-        logger.warning(f"[{request_id}] Unauthorized approval attempt")
-        return {
-            "status": "error",
-            "message": "Unauthorized: not your approval",
-            "data": {}
-        }
-    
-    PENDING_APPROVAL[approval_id]["approved"] = True
-    logger.info(f"[{request_id}] Approved: {approval_id}")
-    return {
-        "status": "success",
-        "data": {"result": "Approved. Ready to commit."},
-        "message": "Use 'commit' to finalize"
-    }
-
-if intent == "commit":
-    # Extract approval ID from message
-    match = re.search(r'commit\s+([\w\-]+)', message.strip())
-    if not match:
-        return {
-            "status": "error",
-            "message": "Invalid commit command format. Use: commit <approval_id>",
-            "data": {}
-        }
-    
-    approval_id = match.group(1)
-    payload = PENDING_APPROVAL.get(approval_id)
-    
-    if not payload:
-        return {
-            "status": "error",
-            "message": "Invalid approval ID",
-            "data": {}
-        }
-    
-    if not payload.get("approved"):
-        return {
-            "status": "error",
-            "message": "Must approve before committing",
-            "data": {}
-        }
-    
-    # Check user authorization
-    if payload.get("user_id") != (conversation_id or "anonymous"):
-        return {
-            "status": "error",
-            "message": "Unauthorized: not your approval",
-            "data": {}
-        }
-    
-    try:
-        write_feedback_memory(payload)
-        del PENDING_APPROVAL[approval_id]
-        logger.info(f"[{request_id}] Committed: {approval_id}")
-        return {
-            "status": "success",
-            "data": {"result": "Learning committed successfully."}
-        }
-    except Exception as e:
-        logger.exception(f"[{request_id}] Commit failed")
-        return {
-            "status": "error",
-            "message": f"Commit failed: {str(e)}",
-            "data": {}
-        }
-
-# Fallback
-logger.warning(f"[{request_id}] Unknown intent: {intent}")
-return {
-    "status": "error",
-    "message": f"Unknown action: {intent}",
-    "data": {}
-}
-```
-
-def _write_conversation_memory(
-*,
-supabase,
-session_id: str,
-user_message: str,
-agent_response: str,
-request_id: str
-) -> bool:
-“””
-Write conversation to database with error handling.
-Returns True on success, False on failure.
-“””
-try:
-record = {
-“id”: str(uuid.uuid4()),
-“session_id”: session_id,
-“user_message”: user_message,
-“agent_response”: agent_response,
-“created_at”: _now(),
-}
-result = supabase.table(“conversation_memory”).insert(record).execute()
-
-```
-    if result.data:
-        logger.info(f"[{request_id}] Memory written successfully")
-        return True
+    # Determine appropriate HTTP status code
+    if 'rate limit' in message.lower():
+        return result, 429  # Too Many Requests
+    elif 'required' in message.lower() or 'invalid' in message.lower():
+        return result, 400  # Bad Request
     else:
-        logger.warning(f"[{request_id}] Memory write returned no data")
-        return False
-        
-except Exception as e:
-    logger.error(f"[{request_id}] Memory write failed: {e}")
-    return False
+        return result, 500  # Internal Server Error
+
+else:
+    # Unknown status
+    logger.error(f"[{session_label}] Unknown status: {status}")
+    return {"status": "error", "message": "Unknown response status"}, 500
 ```
 
-def _now() -> str:
-“”“Get current UTC timestamp in ISO format.”””
-return datetime.datetime.utcnow().isoformat()
+@app.route(’/api/status’, methods=[‘GET’])
+def status():
+“”“Health check endpoint”””
+logger.info(“Status requested”)
+return jsonify({“status”: “online”, “ui_router”: “active”})
 
-# Health check endpoint
+@app.route(’/api/conversation’, methods=[‘POST’])
+def conversation():
+“””
+Main conversation endpoint.
+Expects: {“message”: str, “conversation_id”: str}
+Returns: Agent response data
+“””
+data = request.json or {}
+message = data.get(‘message’)
+conversation_id = data.get(‘conversation_id’)
 
-def health_check() -> Dict[str, Any]:
-“”“Return system health status.”””
-return {
-“status”: “healthy” if IMPORTS_OK else “degraded”,
-“dependencies”: IMPORTS_OK,
-“pending_approvals”: len(PENDING_APPROVAL),
-“timestamp”: _now()
-}
+```
+# Input validation
+if not message:
+    logger.warning("Missing message")
+    return jsonify({"status": "error", "message": "Message required"}), 400
+
+if len(message) > 10000:
+    logger.warning(f"Message too long: {len(message)} chars")
+    return jsonify({"status": "error", "message": "Message too long (max 10000 chars)"}), 400
+
+# Log request
+session_label = conversation_id or 'anonymous'
+logger.info(f"[{session_label}] Conversation: {message[:100]}...")
+
+try:
+    # Call agent router with named parameter
+    result = process_prompt(message, conversation_id=conversation_id)
+    
+    # Handle response with proper status codes
+    response, status_code = handle_agent_response(result, conversation_id)
+    return jsonify(response), status_code
+    
+except Exception as e:
+    # This catches unexpected errors not handled by agent router
+    logger.exception(f"[{session_label}] Unexpected error in conversation endpoint")
+    return jsonify({
+        "status": "error",
+        "message": "Internal server error"
+    }), 500
+```
+
+@app.route(’/api/prompt-agent’, methods=[‘POST’])
+def prompt_agent():
+“””
+Direct agent prompt endpoint (no conversation memory).
+Expects: {“prompt”: str}
+Returns: Agent response data
+“””
+data = request.json or {}
+prompt = data.get(‘prompt’)
+
+```
+# Input validation
+if not prompt:
+    logger.warning("Missing prompt")
+    return jsonify({"status": "error", "message": "Prompt required"}), 400
+
+if len(prompt) > 10000:
+    logger.warning(f"Prompt too long: {len(prompt)} chars")
+    return jsonify({"status": "error", "message": "Prompt too long (max 10000 chars)"}), 400
+
+logger.info(f"[prompt-agent] Request: {prompt[:100]}...")
+
+try:
+    # No conversation_id for direct prompts
+    result = process_prompt(prompt, conversation_id=None)
+    
+    # Handle response
+    response, status_code = handle_agent_response(result, 'prompt-agent')
+    return jsonify(response), status_code
+    
+except Exception as e:
+    logger.exception("[prompt-agent] Unexpected error")
+    return jsonify({
+        "status": "error",
+        "message": "Internal server error"
+    }), 500
+```
+
+@app.route(’/api/lockin/wake-agent-server’, methods=[‘POST’])
+def wake_agent_server():
+“”“Trigger agent server restart via webhook”””
+logger.info(“Wake agent server button pressed”)
+
+```
+try:
+    render_webhook = os.getenv("RENDER_AGENT_RESTART_URL")
+    if not render_webhook:
+        logger.error("RENDER_AGENT_RESTART_URL environment variable not set")
+        return jsonify({
+            "status": "error",
+            "message": "Agent restart not configured. Set RENDER_AGENT_RESTART_URL environment variable."
+        }), 500
+    
+    # Trigger webhook with timeout
+    resp = requests.post(render_webhook, timeout=10)
+    resp.raise_for_status()
+    
+    logger.info("Agent server restart triggered successfully")
+    return jsonify({
+        "status": "success",
+        "message": "Agent server restart triggered"
+    })
+    
+except requests.RequestException as e:
+    logger.error(f"Wake request failed: {str(e)}")
+    return jsonify({
+        "status": "error",
+        "message": "Failed to trigger restart"
+    }), 500
+except Exception as e:
+    logger.exception("Wake agent server failed")
+    return jsonify({
+        "status": "error",
+        "message": "Failed to wake agent server"
+    }), 500
+```
+
+@app.route(’/api/lockin/prompt-agent’, methods=[‘POST’])
+def lockin_prompt_agent():
+“””
+Side window prompt endpoint.
+Expects: {“prompt”: str}
+Returns: Agent response data
+“””
+data = request.json or {}
+prompt = data.get(‘prompt’)
+
+```
+# Input validation
+if not prompt:
+    logger.warning("Missing prompt in side window")
+    return jsonify({"status": "error", "message": "Prompt required"}), 400
+
+if len(prompt) > 10000:
+    logger.warning(f"Side prompt too long: {len(prompt)} chars")
+    return jsonify({"status": "error", "message": "Prompt too long (max 10000 chars)"}), 400
+
+logger.info(f"[side-prompt] Request: {prompt[:100]}...")
+
+try:
+    result = process_prompt(prompt, conversation_id=None)
+    
+    # Handle response
+    response, status_code = handle_agent_response(result, 'side-prompt')
+    return jsonify(response), status_code
+    
+except Exception as e:
+    logger.exception("[side-prompt] Unexpected error")
+    return jsonify({
+        "status": "error",
+        "message": "Internal server error"
+    }), 500
+```
+
+@app.route(’/api/lockin/start-learn-loop’, methods=[‘POST’])
+def start_learn_loop():
+“””
+Trigger learning loop.
+Returns: Approval ID for user to review
+“””
+logger.info(“Start Learn Loop button pressed”)
+
+```
+try:
+    # Send learn command to agent router
+    result = process_prompt("start learn loop", conversation_id=None)
+    
+    status = result.get('status')
+    
+    if status == 'pending':
+        # Learning proposal created, needs approval
+        approval_id = result.get('data', {}).get('approval_id')
+        logger.info(f"Learn loop started, approval_id: {approval_id}")
+        return jsonify({
+            "status": "success",
+            "message": "Learn loop started",
+            "approval_id": approval_id,
+            "proposal": result.get('data', {}).get('proposal')
+        }), 202  # Accepted, awaiting approval
+        
+    elif status == 'success':
+        # Completed successfully
+        logger.info("Learn loop completed")
+        return jsonify({
+            "status": "success",
+            "message": "Learn loop completed",
+            "detail": result.get('data', {}).get('result', 'Triggered')
+        })
+        
+    else:
+        # Error occurred
+        logger.error(f"Learn loop failed: {result.get('message')}")
+        return jsonify({
+            "status": "error",
+            "message": result.get('message', 'Failed to start learn loop')
+        }), 500
+        
+except Exception as e:
+    logger.exception("Start learn loop failed")
+    return jsonify({
+        "status": "error",
+        "message": "Internal server error"
+    }), 500
+```
+
+@app.route(’/api/lockin/wake-gen-server’, methods=[‘POST’])
+def wake_gen_server():
+“”“Trigger generation server restart via webhook”””
+logger.info(“Wake Gen Server button pressed”)
+
+```
+try:
+    gen_webhook = os.getenv("RENDER_GEN_RESTART_URL")
+    if not gen_webhook:
+        logger.error("RENDER_GEN_RESTART_URL environment variable not set")
+        return jsonify({
+            "status": "error",
+            "message": "Gen server restart not configured. Set RENDER_GEN_RESTART_URL environment variable."
+        }), 500
+    
+    # Trigger webhook with timeout
+    resp = requests.post(gen_webhook, timeout=10)
+    resp.raise_for_status()
+    
+    logger.info("Gen server wake triggered successfully")
+    return jsonify({
+        "status": "success",
+        "message": "Gen server wake triggered"
+    })
+    
+except requests.RequestException as e:
+    logger.error(f"Wake gen request failed: {str(e)}")
+    return jsonify({
+        "status": "error",
+        "message": "Failed to trigger gen server wake"
+    }), 500
+except Exception as e:
+    logger.exception("Wake gen server failed")
+    return jsonify({
+        "status": "error",
+        "message": "Failed to wake gen server"
+    }), 500
+```
+
+@app.errorhandler(404)
+def not_found(error):
+“”“Handle 404 errors”””
+return jsonify({
+“status”: “error”,
+“message”: “Endpoint not found”
+}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+“”“Handle 500 errors”””
+logger.exception(“Internal server error”)
+return jsonify({
+“status”: “error”,
+“message”: “Internal server error”
+}), 500
+
+if **name** == “**main**”:
+port = int(os.getenv(“PORT”, 10000))
+logger.info(f”Starting UI Router on port {port}”)
+logger.info(“Agent router integration: READY”)
+app.run(host=“0.0.0.0”, port=port)

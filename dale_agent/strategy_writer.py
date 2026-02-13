@@ -30,46 +30,30 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 class StrategyWriter:
     """
     Production-ready Gemini strategy generator.
-
-    - Uses Gemini only
-    - Throttled for Google free tier safety
-    - Strict 10-step chunk enforcement
-    - Persistent markdown storage
-    - Bounded retry logic
+    Called via the Main Router trigger.
     """
 
-    # ---- Free tier throttle settings ----
-    MIN_SECONDS_BETWEEN_CALLS = 20  # Safe cushion for free tier
-    MAX_RETRIES = 2                 # Prevent infinite recursion
+    MIN_SECONDS_BETWEEN_CALLS = 20  
+    MAX_RETRIES = 2                 
 
     def __init__(self, plan_file: str = "agent_strategy.md"):
         self.plan_file = plan_file
         self.current_step = self._infer_current_step()
         self._last_call_time: Optional[float] = None
 
-    # ==============================
-    # Public Method
-    # ==============================
-
     async def generate_strategy_chunk(self) -> str:
         """
         Generates exactly 10 new strategy steps.
-        Applies throttle + validation + bounded retry.
         """
-
         await self._throttle()
-
         context = self._load_current_plan()
 
         prompt = f"""
 Generate a highly detailed, accurate strategy for an agentic AI to become self-improving.
-
 Output EXACTLY the next 10 steps (steps {self.current_step + 1} to {self.current_step + 10}).
-
 Base strictly on human brain mechanics: modular, layered learning with fanatic mission obsession.
 
 Each step MUST use this EXACT structure:
-
 - **Step N**: Title (1 clear sentence).
 - **Description**: 1-2 paragraphs, detailed, concise, mission-focused.
 - **Exact Knowledge**: Bullet checklist of locked-in facts (5-10 items, factual only).
@@ -106,98 +90,60 @@ Current plan context:
 
                 self._append_to_plan(chunk)
                 self.current_step += 10
-
                 self._last_call_time = time.time()
 
                 return chunk
 
             except Exception as e:
                 if attempt >= self.MAX_RETRIES:
-                    raise RuntimeError(f"Strategy generation failed after retries: {str(e)}")
+                    raise RuntimeError(f"Strategy generation failed: {str(e)}")
                 await asyncio.sleep(3)
 
         raise RuntimeError("Unexpected failure in generate_strategy_chunk.")
 
-    # ==============================
-    # Internal Helpers
-    # ==============================
-
     async def _throttle(self):
-        """
-        Ensures safe spacing between API calls.
-        Designed to remain well within Gemini free tier.
-        """
-
         if self._last_call_time is None:
             return
-
         elapsed = time.time() - self._last_call_time
         if elapsed < self.MIN_SECONDS_BETWEEN_CALLS:
             wait_time = self.MIN_SECONDS_BETWEEN_CALLS - elapsed
             await asyncio.sleep(wait_time)
 
     def _validate_chunk(self, chunk: str) -> bool:
-        """
-        Validates that exactly 10 steps are present.
-        """
-
         step_count = chunk.count("**Step")
-        if step_count != 10:
-            return False
-
-        if not chunk.strip().startswith("**Step"):
-            return False
-
-        return True
+        return step_count == 10 and chunk.strip().startswith("**Step")
 
     def _load_current_plan(self) -> str:
-        """
-        Loads existing markdown plan.
-        """
-
         if os.path.exists(self.plan_file):
             with open(self.plan_file, "r", encoding="utf-8") as f:
                 return f.read()
-
         return "No prior plan—initialize from basics."
 
     def _append_to_plan(self, chunk: str):
-        """
-        Appends new chunk to markdown file.
-        """
-
         file_exists = os.path.exists(self.plan_file)
-
         with open(self.plan_file, "a", encoding="utf-8") as f:
             if not file_exists:
                 f.write("# Agentic AI Self-Improvement Strategy Plan\n\n")
             f.write(chunk + "\n\n")
 
     def _infer_current_step(self) -> int:
-        """
-        Infers current step number from existing file.
-        Ensures continuation without duplication.
-        """
-
         if not os.path.exists(self.plan_file):
             return 0
-
         with open(self.plan_file, "r", encoding="utf-8") as f:
             content = f.read()
-
         return content.count("**Step")
 
 
 # ==============================
-# Example Runner
+# ROUTER TRIGGER POINT
 # ==============================
 
-async def main():
-    writer = StrategyWriter()
-    chunk = await writer.generate_strategy_chunk()
-    print("\n===== GENERATED STRATEGY CHUNK =====\n")
-    print(chunk)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+def run() -> str:
+    """
+    The only way to trigger this script now. 
+    Called by the main router when 'run strategy_writer.py' is detected.
+    """
+    try:
+        return asyncio.run(StrategyWriter().generate_strategy_chunk())
+    except Exception as e:
+        return f"Router Error: Strategy execution failed: {str(e)}"

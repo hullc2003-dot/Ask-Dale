@@ -84,6 +84,25 @@ def route(
         return _ui_ok("Generation server is awake.")
 
     # --------------------------------------------------
+    # STRATEGY WRITER EXECUTION (PLAIN TEXT RESPONSE)
+    # --------------------------------------------------
+    if "run strategy_writer.py" in prompt.lower():
+        try:
+            # Execute the strategy writer
+            import strategy_writer
+            output = strategy_writer.run() 
+            
+            # Return as plain text for the UI to display
+            return {
+                "status": "success",
+                "result": f"Strategy writer triggered successfully. Output: {str(output)}",
+            }
+        except Exception as e:
+            # Return error as plain text
+            return _ui_error(f"Error: Strategy writer failed to run. {str(e)}")
+
+
+    # --------------------------------------------------
     # AGENT / PROMPT
     # --------------------------------------------------
     if intent in {"agent", "prompt"}:

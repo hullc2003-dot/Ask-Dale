@@ -39,9 +39,9 @@ RATE_LIMIT = 30  # requests per minute
 # Button → Intent mapping (lowercase keys)
 
 BUTTON_INTENTS = {
-“wake”: “wake”,
-“agent”: “agent”,
-“server”: “server”,
+"wake": "wake",
+"agent": "agent",
+"server”: “server”,
 “wake gen”: “wake_gen”,
 “approve”: “approve”,
 “commit”: “commit”,

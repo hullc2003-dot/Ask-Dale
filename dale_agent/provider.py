@@ -12,7 +12,7 @@ import datetime
 from supabase import create_client, Client
 from typing import Optional, Dict, Any, List
 
-logger = logging.getLogger(**name**)
+logger = logging.getLogger(__name__)
 
 # Singleton client instance
 

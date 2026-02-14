@@ -9,7 +9,7 @@ import requests
 try:
 from agent_router import process_prompt  # Must exist in agent_router.py
 except ImportError as e:
-logging.error(f”Failed to import agent_router: (e)”)
+logging.error(f"Failed to import agent_router: {e}")
 logging.error(“Ensure agent_router.py exists with process_prompt function”)
 raise
 

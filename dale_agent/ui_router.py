@@ -158,25 +158,6 @@ def start_learn_loop():
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 
-@app.route('/api/lockin/wake-gen-server', methods=['POST'])
-def wake_gen_server():
-    """Trigger gen server restart"""
-    logger.info("Wake gen server requested")
-
-    try:
-        webhook = os.getenv("RENDER_GEN_RESTART_URL")
-        if not webhook:
-            return jsonify({"status": "error", "message": "Webhook not configured"}), 500
-        
-        resp = requests.post(webhook, timeout=10)
-        resp.raise_for_status()
-        
-        return jsonify({"status": "success", "message": "Gen server triggered"})
-    except Exception as e:
-        logger.error(f"Wake gen failed: {e}")
-        return jsonify({"status": "error", "message": "Failed to wake gen server"}), 500
-
-
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
     logger.info(f"Starting UI Router on port {port}")

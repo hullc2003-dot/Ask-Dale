@@ -17,7 +17,7 @@ IMPORTS_OK = True
 
 try:
     from openrouter_client import run_agent
-    from junk_drawer_processor import normalize_input
+    from junk_drawer_processor
     from gap_analyzer import analyze_gaps
     from improvement_engine import propose_improvements
     from feedback_memory import write_feedback_memory

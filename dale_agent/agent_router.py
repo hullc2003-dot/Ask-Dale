@@ -17,7 +17,7 @@ logger = logging.getLogger(**name**)
 
 try:
 from config import settings
-from dale import run_agent
+from openrouter_client import run_agent
 from junk_drawer_processor import normalize_input
 from gap_analyzer import analyze_gaps
 from improvement_engine import propose_improvements

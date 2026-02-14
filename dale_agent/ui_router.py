@@ -125,7 +125,7 @@ def wake_agent_server():
         if not webhook:
             return jsonify({"status": "error", "message": "Webhook not configured"}), 500
         
-        resp = requests.post(webhook, timeout=10)
+        resp = requests.post(webhook, timeout=1000)
         resp.raise_for_status()
         
         return jsonify({"status": "success", "message": "Agent server restart triggered"})

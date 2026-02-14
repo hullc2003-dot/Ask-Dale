@@ -41,12 +41,12 @@ RATE_LIMIT = 30  # requests per minute
 BUTTON_INTENTS = {
 "wake": "wake",
 "agent": "agent",
-"server”: “server”,
-“wake gen”: “wake_gen”,
-“approve”: “approve”,
-“commit”: “commit”,
-“prompt agent”: “prompt”,
-“start learn”: “learn”,
+"server": "server",
+"wake gen": "wake_gen",
+"approve": "approve",
+"commit": "commit",
+"prompt agent": "prompt",
+"start learn": "learn",
 }
 
 def check_rate_limit(user_id: str) -> bool:

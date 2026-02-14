@@ -26,7 +26,7 @@ from strategy_writer import StrategyWriter
 from provider import get_supabase_client
 IMPORTS_OK = True
 except ImportError as e:
-logger.error(f”Failed to import dependencies: {e}”)
+logger.error(f"Failed to import dependencies: {e}")
 IMPORTS_OK = False
 
 # Router state with cleanup

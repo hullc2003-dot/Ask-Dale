@@ -17,7 +17,7 @@ IMPORTS_OK = True
 
 try:
     from openrouter_client import run_agent
-    from junk_drawer_processor
+    from junk_drawer_processor import _insert_into_specialist
     from gap_analyzer import analyze_gaps
     from improvement_engine import propose_improvements
     from feedback_memory import write_feedback_memory
@@ -28,7 +28,7 @@ except ImportError as e:
     IMPORTS_OK = False
     # Define dummy functions so the code doesn't crash on definition
     def run_agent(*args): return "Dependency Error"
-    def normalize_input(x): return x
+    def _insert_into_specialist(x): return x
     def analyze_gaps(): return {}
     def propose_improvements(x): return {}
     def write_feedback_memory(x): pass

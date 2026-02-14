@@ -5,8 +5,8 @@ import asyncio
 import time
 from typing import Optional
 from dotenv import load_dotenv
-from google import genai
-from google.genai.types import GenerateContentConfig
+from openrouter_client import run_agent
+
 
 
 # ==============================

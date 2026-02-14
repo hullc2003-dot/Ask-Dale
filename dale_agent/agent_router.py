@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # Core imports with validation
 
 try:
-    from config import settings
     from openrouter_client import run_agent
     from junk_drawer_processor import normalize_input
     from gap_analyzer import analyze_gaps

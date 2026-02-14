@@ -41,7 +41,6 @@ BUTTON_INTENTS = {
     "wake": "wake",
     "agent": "agent",
     "server": "server",
-    "wake gen": "wake_gen",
     "approve": "approve",
     "commit": "commit",
     "prompt agent": "prompt",
@@ -51,10 +50,10 @@ BUTTON_INTENTS = {
 def check_rate_limit(user_id: str) -> bool:
     """Rate limiting: max RATE_LIMIT requests per minute per user."""
     now = time.time()
-    # Remove requests older than 1 minute
+    # Remove requests older than 3 minutes
     REQUEST_COUNTS[user_id] = [
         t for t in REQUEST_COUNTS[user_id]
-        if now - t < 60
+        if now - t < 180
     ]
 
     if len(REQUEST_COUNTS[user_id]) >= RATE_LIMIT:

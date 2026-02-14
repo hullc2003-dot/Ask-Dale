@@ -205,20 +205,6 @@ def _route_intent(
             }
         }
 
-    if intent == "wake_gen":
-        try:
-            run_agent("ping")
-            return {
-                "status": "success",
-                "data": {"result": "Generation server awake."}
-            }
-        except Exception as e:
-            logger.error(f"[{request_id}] wake_gen failed: {e}")
-            return {
-                "status": "error",
-                "message": f"Failed to wake generation server: {str(e)}",
-                "data": {}
-            }
 
     # Strategy intent
     if intent == "strategy":

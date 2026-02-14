@@ -67,25 +67,25 @@ return True
 ```
 
 def clean_expired_approvals():
-“”“Remove approvals older than APPROVAL_TIMEOUT.”””
+"""Remove approvals older than APPROVAL_TIMEOUT."""
 now = datetime.datetime.utcnow()
 expired = [
 aid for aid, data in PENDING_APPROVAL.items()
-if (now - data.get(“created_at”, now)).seconds > APPROVAL_TIMEOUT
+if (now - data.get("created_at", now)).seconds > APPROVAL_TIMEOUT
 ]
 for aid in expired:
-logger.info(f”Cleaning expired approval: {aid}”)
+logger.info(f"Cleaning expired approval: {aid}”)
 del PENDING_APPROVAL[aid]
 
 def validate_agent_response(response: Any) -> tuple[bool, str]:
-“”“Validate that agent response is usable.”””
+"""Validate that agent response is usable."""
 if response is None:
-return False, “Agent returned None”
+return False, "Agent returned None"
 if isinstance(response, str) and not response.strip():
-return False, “Agent returned empty response”
+return False, "Agent returned empty response"
 if len(str(response)) > 100000:  # 100KB limit
-return False, “Response too large (>100KB)”
-return True, “”
+return False, "Response too large (>100KB)"
+return True, ""
 
 def detect_intent(message: str) -> str:
 “””

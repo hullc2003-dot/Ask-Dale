@@ -53,7 +53,7 @@ class JunkDrawerProcessor:
 
         return stats
 
-    async def process_single_junk_table(self, junk_table: str) -> int:
+    async def _process_single_junk_table(self, junk_table: str) -> int:
         resp = self.supabase.table(junk_table).select("*").execute()
         rows: List[Dict[str, Any]] = resp.data or []
 
@@ -76,7 +76,7 @@ class JunkDrawerProcessor:
 
         return processed
 
-    async def insert_into_specialist(self, table_name: str, package_text: str) -> None:
+    async def _insert_into_specialist(self, table_name: str, package_text: str) -> None:
         """
         Baseline behavior:
         Insert the package as a new row in the specialist table.

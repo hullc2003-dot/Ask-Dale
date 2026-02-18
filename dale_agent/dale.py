@@ -52,7 +52,7 @@ async def go_to_work(self, prompt: str, session_id: str = None) -> Dict[str, Any
     Main work cycle - Dale's daily routine.
     
     Workflow:
-    1. Process pending knowledge (junk → skill tables)
+    1. Process pending knowledge (run trainer and normalizer with skill tables)
     2. Run self-improvement analysis
     3. Execute approved improvements
     4. Generate requested content
@@ -117,7 +117,7 @@ async def go_to_work(self, prompt: str, session_id: str = None) -> Dict[str, Any
 
 async def _process_knowledge_queue(self, batch_size: int = 10) -> Dict[str, Any]:
     """
-    Process items from junk tables into structured skill tables.
+    Process items from structured skill tables.
     This is where raw scraped knowledge becomes organized learning.
     """
     try:
@@ -130,7 +130,7 @@ async def _process_knowledge_queue(self, batch_size: int = 10) -> Dict[str, Any]
             .execute()
 
         if not queue_result.data:
-            # No queue? Check junk tables directly
+            # No queue? Check all tables directly
             return await self._auto_discover_knowledge()
 
         processed = []
@@ -143,16 +143,16 @@ async def _process_knowledge_queue(self, batch_size: int = 10) -> Dict[str, Any]
                     "processing_status": "processing"
                 }).eq("id", item["id"]).execute()
 
-                # Get the raw junk item
-                junk_item = self.supabase.table(item["source_table"]) \
+                # Get the raw table item
+                  item = self.supabase.table(item["source_table"]) \
                     .select("*") \
                     .eq("id", item["source_id"]) \
                     .execute()
 
-                if not junk_item.data:
+                if not item.data:
                     raise ValueError(f"Source item not found: {item['source_id']}")
 
-                raw_content = junk_item.data[0]
+                raw_content = item.data[0]
 
                 # Use AI to structure the knowledge
                 structured = await self._structure_knowledge(

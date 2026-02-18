@@ -22,7 +22,7 @@ The executive agent that orchestrates the entire self-improving SEO system.
 
 ```
 Dale's responsibilities:
-1. Process raw knowledge from junk tables → structured skill tables
+1. Process raw knowledge from structured skill tables
 2. Analyze skill gaps and identify improvement areas
 3. Execute self-improvement suggestions
 4. Generate SEO content and strategies

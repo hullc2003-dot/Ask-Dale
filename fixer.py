@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from groq import groq/mixtral-8x7b-32768
+from groq import mixtral-8x7b-32768
 import uvicorn
 
 import fixer  # make sure fixer.py exists in root
@@ -96,7 +96,7 @@ async def chat_endpoint(request: ChatRequest):
     return {"output": response.choices[0].message.content}
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL = "Groq/compound"
+MODEL = "mixtral-8x7b-32768"
 client = Groq(api_key=GROQ_API_KEY)
 
 # ... [get_python_files, extract_file_data, ask_groq_to_fix, apply_fixes remain same] ...

@@ -76,14 +76,7 @@ def client_layer(user_input: str) -> str:
 1. When you understand, end your reply with a line that starts exactly with:
    BUILDER_TASK: <plain English instructions for the Builder>
 
-The Builder can do the following:
-
-- Scan the repo and fix broken or incomplete Python files
-- Check build/blueprint status
-- Run the repo fixer on the whole codebase
-
-Keep your tone natural. No jargon. No JSON. Just talk to the user like a person."""
-
+The Builder 
     response = client.chat.completions.create(
         model=MODEL,
         messages=[

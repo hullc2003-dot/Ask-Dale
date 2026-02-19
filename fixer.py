@@ -205,30 +205,21 @@ def run_repo_fixer(repo_path: str = ".") -> str:
 @app.get("/")
 async def root():
     """Basic browser verification."""
-    return {
+
+return {
         "status": "online",
         "mode": "Live",
-        "agent": "Dale",
-        "version": brain.version
+        "agent": "fixer",
+        
     }
 
 @app.get("/health")
 async def health():
     """
     Status polling for the dashboard indicator light.
-    Reads live kill switch state from BrainState.
     """
-    kill_switch = brain.governance.kill_switches.get("global", False)
-    master = brain.governance.master_enabled
-
-    return {
-        "status": "online" if master and not kill_switch else "disabled",
-        "master_enabled": master,
-        "kill_switch_active": kill_switch,
-        "agent_id": brain.agent_id,
-        "version": brain.version,
-        "use_url_enabled": brain.learning.router_toggles.get("use_url", False)
-    }
+    
+ 
 
 @app.post("/wake")
 async def wake_up():
@@ -238,6 +229,7 @@ async def wake_up():
 @app.get("/check-env")
 async def check_env():
     """Temporary env var checker — remove before going to production."""
+    
     import os
     return {
         "SUPABASE_URL": "set" if os.getenv("SUPABASE_URL") else "MISSING",

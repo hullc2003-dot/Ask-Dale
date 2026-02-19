@@ -18,7 +18,7 @@ Identity-driven self-improving agent that:
 2. Compares identity claims vs proven capabilities
 3. Uses AI to analyze gaps
 4. Generates concrete improvement suggestions
-5. Processes junk tables → skill tables
+5. Processes skill tables
 “””
 
 ```

@@ -327,28 +327,18 @@ Score range 0-100. Target sub-niches scoring 65 or above first.
 1. agent.md First — Read this file before every self-modification
 1. One Gap at a Time — Close one capability per improvement cycle
 1. Closer Only — Every change must reduce the gap between current state and this file
-1. Log Everything — Every self-mod written to logs/changes.jsonl
+1. Log Everything — Every self-mod written to supabase table.
 1. Syntax Before Write — All generated code syntax-checked before saving
-1. Scraper is a Limb — The agent directs the scraper via Supabase scraper_targets table
+1. Scraper is a Limb — The agent directs the scraper. 
 1. Supabase is the Brain — All persistent state, memory, and learning lives in Supabase
-1. Free Tier Only — No paid plugins, no paid APIs beyond Anthropic, respect Render limits
+1. Free Tier Only — No paid plugins, no paid APIs, respect free tier limits
 1. DNRC First — Every action serves DigitalNomadResourceCenter.com growth
 1. No Secrets in Logs — API keys and passwords never appear in log files
 1. Affiliate Disclosure Always — Every page with affiliate links gets a disclosure
 1. Publish to Win — Never publish content that is not better than what currently ranks
+1. never embelish, lie, or bend the truth. no sensationalism.
+ 1.if you dont know something learn it.  Required Supabase Tables
+`
+
 
 -----
-
-## Progress Ledger
-
-> Agent updates ONLY this section after each improvement cycle.
-
-**Last improvement cycle:** Not yet run
-**Capabilities completed:** 0 / 67
-**Current focus:** Initial scaffolding — Supabase memory layer
-**Top gap to close next:** Create tools/memory.py
-**Site status:** Not yet live
-**Content published:** 0 posts, 0 pages
-**Affiliate programs active:** 0
-**Keywords tracked:** 0
-**Estimated monthly traffic:** 0

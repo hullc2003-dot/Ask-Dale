@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from groq import groq/compound
+from groq import groq/mixtral-8x7b-32768
 import uvicorn
 
 import fixer  # make sure fixer.py exists in root

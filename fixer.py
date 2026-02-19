@@ -5,8 +5,12 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from groq import Groq
+import uvicorn
 
 import fixer  # make sure fixer.py exists in root
+import blueprint  # Assumes blueprint.py exists in root
 
 app = FastAPI()
 
@@ -18,6 +22,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- UI Integration Models ---
+
+class ChatRequest(BaseModel):
+    input: str
 
 # -------------------------
 # Health Check
@@ -35,6 +44,39 @@ def health():
 async def auto_fix():
     fixer.run_fixer(".")
     return {"status": "repo fixed"}
+
+# -------------------------
+# Chat Endpoint (UI Button Bridge)
+# -------------------------
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    user_input = request.input.lower()
+    
+    # 1. Handle Blueprint/Fixing Logic
+    if "fix" in user_input or "blueprint" in user_input:
+        try:
+            report = blueprint.full_diff()
+            
+            if "apply" in user_input:
+                run_fixer(".")
+                return {"output": "✅ Fixer active: I've analyzed the blueprint and patched the source files."}
+                
+            return {
+                "output": f"🔍 Status: {report['blueprint']['completion_pct']}% complete. "
+                          f"Top gap: {report['next_action']['description']}. "
+                          "Type 'Apply fix' to proceed."
+            }
+        except Exception as e:
+            return {"output": f"❌ Error reading blueprint: {str(e)}"}
+    
+    # 2. General AI Reasoning
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": request.input}],
+        temperature=0.2,
+    )
+    return {"output": response.choices[0].message.content}
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
@@ -170,4 +212,5 @@ def run_fixer(repo_path: str):
 
 
 if __name__ == "__main__":
-    run_fixer(".")
+    # Start the server to listen for UI button clicks
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -52,8 +52,8 @@ def health():
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    output = handle_prompt(request.input)
-    return {"output": reply}
+      output = handle_prompt(request.input)
+     return {"output": reply}
 
 conversation_history = []
 

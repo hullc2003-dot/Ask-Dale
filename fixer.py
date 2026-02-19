@@ -37,30 +37,6 @@ allow_credentials=True,
 allow_methods=["*"],
 allow_headers=["*"],
 )
-# =========================
-# Pydantic Models
-# =========================
-
-class ChatRequest(BaseModel):
-    input: str
-
-# =========================
-# Git Helper
-# =========================
-
-def git_commit_changes(message: str = "Agent Auto-Fix: Resolved architecture gaps") -> bool:
-    try:
-        subprocess.run(["git", "add", "."], check=True)
-        subprocess.run(["git", "commit", "-m", message], check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-
-
-
-
-
 
 # =========================
 # Endpoints
@@ -78,6 +54,117 @@ def health():
 async def chat_endpoint(request: ChatRequest):
     output = handle_prompt(request.input)
     return {"output": output}
+
+conversation_history = []
+
+# =========================
+
+# Client Layer
+
+# Talks to you in plain English, confirms understanding,
+
+# translates your words into instructions for the Builder
+
+# =========================
+
+def client_layer(user_input: str) -> str:
+    conversation_history.append({"role": "user", "content": user_input})
+
+    system_prompt = """You are the Client. Your two jobs:
+
+1. Talk to the user in plain English. Confirm you understand what they want, or ask one clear clarifying question if you don’t.
+1. When you understand, end your reply with a line that starts exactly with:
+   BUILDER_TASK: <plain English instructions for the Builder>
+
+The Builder can do the following:
+
+- Scan the repo and fix broken or incomplete Python files
+- Check build/blueprint status
+- Run the repo fixer on the whole codebase
+
+Keep your tone natural. No jargon. No JSON. Just talk to the user like a person."""
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            *conversation_history,
+        ],
+        temperature=0.5,
+    )
+
+    reply = response.choices[0].message.content.strip()
+    conversation_history.append({"role": "assistant", "content": reply})
+    return reply
+
+# =========================
+
+# Builder Layer
+
+# Receives plain English instructions from the Client,
+
+# does the actual work, returns a plain English result
+
+# =========================
+
+def builder_layer(task: str) -> str:
+    task_lower = task.lower()
+
+    if "status" in task_lower or "blueprint" in task_lower:
+        try:
+            import blueprint
+            report = blueprint.full_diff()
+            pct = report["blueprint"]["completion_pct"]
+            return f"Blueprint is {pct}% complete."
+        except Exception as e:
+            return f"Tried to check the blueprint but hit an error: {e}"
+
+    # Default: run the repo fixer
+    repo_map = build_repo_map_for_llm(".")
+    ai_response = ask_groq_to_fix(repo_map)
+    apply_fixes(ai_response, ".")
+    committed = git_commit_changes()
+    status = "committed to git" if committed else "applied but git commit failed"
+    return f"Scanned the repo, applied fixes, and {status}."
+
+# =========================
+
+# Core Agent Handler
+
+# =========================
+
+def handle_prompt(user_input: str) -> str:
+    client_reply = client_layer(user_input)
+
+    if "BUILDER_TASK:" in client_reply:
+        parts = client_reply.split("BUILDER_TASK:", 1)
+        user_facing = parts[0].strip()
+        task = parts[1].strip()
+
+        result = builder_layer(task)
+        return f"{user_facing}\n\nHere's what happened: {result}"
+
+    # Client is asking for clarification — return as-is
+    return client_reply
+
+
+
+
+
+# =========================
+# Git Helper
+# =========================
+
+def git_commit_changes(message: str = "Agent Auto-Fix: Resolved architecture gaps") -> bool:
+    try:
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-m", message], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+
 
 # =========================
 # Entrypoint

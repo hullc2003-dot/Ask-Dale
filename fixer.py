@@ -11,7 +11,6 @@ from groq import Groq
 from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
-from langgraph.graph import StateGraph
 
 # =========================
 # Load Environment
@@ -32,15 +31,6 @@ client = Groq(api_key=GROQ_API_KEY)
 # =========================
 
 app = FastAPI()
-
-# =========================
-# LangGraph State
-# =========================
-
-class AgentState(TypedDict):
-    messages: Annotated[list, operator.add]
-
-workflow = StateGraph(AgentState)
 
 # =========================
 # Pydantic Models
@@ -232,4 +222,5 @@ async def chat_endpoint(request: ChatRequest):
 # =========================
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

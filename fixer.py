@@ -80,9 +80,9 @@ def client_layer(user_input: str) -> str:
     reply = response.choices[0].message.content.strip()
     conversation_history.append({"role": "assistant", "content": reply})
     return reply
+    *conversation_history,
 
-            *conversation_history,
-            
+
 # =========================
 
 # Builder 
@@ -92,11 +92,9 @@ def client_layer(user_input: str) -> str:
 # does the actual work, returns a plain English result
 
 # =========================
-
 def builder_layer(task: str) -> str:
     
-  
-    Client = give builder prompts 
+   Client = give builder prompts 
     apply_fixes(builder_replys, "list of completed tasks") committed
     committed = git_commit_changes()
     status = "committed to git" if committed else "applied but git commit failed"
@@ -131,9 +129,9 @@ def git_commit_changes(message: str = "Agent Auto-Fix: Resolved architecture gap
     try:
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", message], check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
+    return True
+ except subprocess.CalledProcessError:
+    return False
 
 
 # =========================

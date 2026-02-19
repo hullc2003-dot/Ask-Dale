@@ -20,7 +20,7 @@ import uvicorn
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY_2")
-MODEL = "mixtral-8x7b-32768"
+MODEL = "groq"
 
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY_2 not set")

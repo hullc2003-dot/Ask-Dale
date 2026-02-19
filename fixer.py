@@ -200,32 +200,57 @@ def run_repo_fixer(repo_path: str = ".") -> str:
     status = "committed" if committed else "applied (git commit failed — check repo state)"
     return f"Repository scanned, fixed, and {status}."
 
-# =========================
+# =========================# — ENDPOINTS —
 
-# endpoints
-
-# =========================
 @app.get("/")
 async def root():
-   """Basic ui verification."""
+    """Basic browser verification."""
     return {
         "status": "online",
         "mode": "Live",
-        "agent": "fixer",
+        "agent": "Dale",
+        "version": brain.version
     }
-   
+
 @app.get("/health")
 async def health():
-  """
-   Status polling for the dashboard indicator light.
-  } 
-}
+    """
+    Status polling for the dashboard indicator light.
+    Reads live kill switch state from BrainState.
+    """
+    kill_switch = brain.governance.kill_switches.get("global", False)
+    master = brain.governance.master_enabled
+
+    return {
+        "status": "online" if master and not kill_switch else "disabled",
+        "master_enabled": master,
+        "kill_switch_active": kill_switch,
+        "agent_id": brain.agent_id,
+        "version": brain.version,
+        "use_url_enabled": brain.learning.router_toggles.get("use_url", False)
+    }
+
 @app.post("/wake")
 async def wake_up():
-  {"""Keeps Render instance from sleeping."""}
-  return {"status": "awake", "message": "Backend session refreshed."}
-       
-    def handle_prompt(user_input: str) -> str:
+    """Keeps Render instance from sleeping."""
+    return {"status": "awake", "message": "Backend session refreshed."}
+
+@app.get("/check-env")
+async def check_env():
+    """Temporary env var checker — remove before going to production."""
+    import os
+    return {
+        "SUPABASE_URL": "set" if os.getenv("SUPABASE_URL") else "MISSING",
+        "SUPABASE_KEY": "set" if os.getenv("SUPABASE_KEY") else "MISSING",
+        "SUPABASE_SERVICE_ROLE_KEY": "set" if os.getenv("SUPABASE_SERVICE_ROLE_KEY") else "MISSING",
+        "GROQ_API_KEY": "set" if os.getenv("GROQ_API_KEY") else "MISSING",
+        "GEMINI_API_KEY": "set" if os.getenv("GEMINI_API_KEY") else "MISSING",
+        "ALLOWED_ORIGIN": "set" if os.getenv("ALLOWED_ORIGIN") else "MISSING",
+    }
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):str:
         """
     Main entrypoint for natural language prompts.
     """

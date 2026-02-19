@@ -3,6 +3,9 @@ import ast
 import json
 from groq import Groq
 from pathlib import Path
+from fastapi import FastAPI
+
+app = FastAPI()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 

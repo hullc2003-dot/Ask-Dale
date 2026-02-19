@@ -53,7 +53,7 @@ def health():
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     output = handle_prompt(request.input)
-    return {"output": output}
+    return {"output": reply}
 
 conversation_history = []
 
@@ -69,24 +69,19 @@ conversation_history = []
 
 def client_layer(user_input: str) -> str:
     conversation_history.append({"role": "user", "content": user_input})
+reply = response.choices[0].message.content.strip()
+    conversation_history.append({"role": "assistant", "content": reply})
+return reply
 
-    system_prompt = """You are the Client. Your two jobs:
-
+ system_prompt = """You are the Client. Your two jobs:
 1. Talk to the user in plain English. if you do not understand ask for clarificatiion.  
       until you understand. when you understand the prompt confirm you understand what they want. 
 2. Pass users prompts to the builder agent. GIVE the builder clear concise prompts. 
             *conversation_history,
-        ], I'll
-        temperature=0.5,
-    ) by
-
-    reply = response.choices[0].message.content.strip()
-    conversation_history.append({"role": "assistant", "content": reply})
-    return reply
-
+            
 # =========================
 
-# Builder Layer
+# Builder 
 
 # Receives plain English instructions from the Client,
 
@@ -95,10 +90,10 @@ def client_layer(user_input: str) -> str:
 # =========================
 
 def builder_layer(task: str) -> str:
-    task_lower = task.lower()
+    
   
-    ai_response = ask_groq_to_fix(repo)
-    apply_fixes(ai_response, ".")
+    Client = give builder prompts 
+    apply_fixes(builder_replys, "list of completed tasks") committed
     committed = git_commit_changes()
     status = "committed to git" if committed else "applied but git commit failed"
     return f"Scanned the repo, applied fixes, and {status}."

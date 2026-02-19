@@ -160,7 +160,7 @@ class AgentState(TypedDict):
 # Define agents
 def create_agent_fn(llm, tools, system_prompt):
     prompt = PromptTemplate.from_template(system_prompt)
-    agent = create_agent(llm, tools, prompt)
+    agent = create_react_agent(llm, tools, prompt)
     executor = AgentExecutor(agent=agent, tools=tools, handle_parsing_errors=True)
     return executor
 

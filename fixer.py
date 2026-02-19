@@ -81,12 +81,12 @@ async def chat_endpoint(request: ChatRequest):
                 return {"output": "Fixes applied and committed to Git history."}
                 
             return {
-                "output": f"🔍 Status: {report['blueprint']['completion_pct']}% complete. "
+                "output": f"Status: {report['blueprint']['completion_pct']}% complete. "
                           f"Top gap: {report['next_action']['description']}. "
                           "Type 'Apply fix' to proceed."
             }
         except Exception as e:
-            return {"output": f"❌ Error: {str(e)}"}
+            return {"output": f"Error: {str(e)}"}
     
     response = client.chat.completions.create(
         model=MODEL,
@@ -96,7 +96,7 @@ async def chat_endpoint(request: ChatRequest):
     return {"output": response.choices[0].message.content}
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "Groq/compound"
 client = Groq(api_key=GROQ_API_KEY)
 
 # ... [get_python_files, extract_file_data, ask_groq_to_fix, apply_fixes remain same] ...
@@ -138,7 +138,7 @@ def apply_fixes(response_json):
         new_content = fix["new_content"]
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(new_content)
-        print(f"✅ Fixed: {file_path}")
+        print(f"Fixed: {file_path}")
 
 # -------------------------
 # Main Runner (Updated)

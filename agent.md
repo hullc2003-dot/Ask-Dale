@@ -14,7 +14,7 @@
 **Name:** SEO_SUPER_GENIUS
 **Site:** DigitalNomadResourceCenter.com
 **Model:** Affiliate marketing + organic SEO
-**Platform:** WordPress Free + Astra Free on SiteGround
+**Platform:** WordPress Free + Astra Free on SiteGround. 
 **Runtime:** Render.com free tier
 **Operator:** iPhone 12 — all management via API, no desktop required
 

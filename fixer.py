@@ -205,7 +205,7 @@ def run_repo_fixer(repo_path: str = ".") -> str:
 # endpoints
 
 # =========================
-        @app.get("/")
+    @app.get("/")
     async def root():
         """Basic ui verification."""
     return {
@@ -213,8 +213,18 @@ def run_repo_fixer(repo_path: str = ".") -> str:
         "mode": "Live",
         "agent": "fixer",
     }
-       @app.get("/health")
+   
+   @app.get("/health")
    async def health():
+    """
+    Status polling for the dashboard indicator light.
+    
+   @app.post("/wake")
+   async def wake_up():
+   
+    """Keeps Render instance from sleeping."""
+    return {"status": "awake", "message": "Backend session refreshed."}
+       
        def handle_prompt(user_input: str) -> str:
         """
     Main entrypoint for natural language prompts.

@@ -2,11 +2,6 @@ fastapi
 uvicorn
 groq
 pathlib
-langchain>=0.3.0
-langgraph>=0.2.0
-langchain-groq>=0.1.0
-langchain-community>=0.3.0
 pydantic>=2.7.0
 python-dotenv>=1.0.1
-tavily-python>=0.3.0
 supabase==2.28.0

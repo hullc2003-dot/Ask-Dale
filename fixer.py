@@ -4,8 +4,22 @@ import json
 from groq import Groq
 from pathlib import Path
 from fastapi import FastAPI
+import os
 
 app = FastAPI()
+import fixer
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.post("/auto-fix")
+async def auto_fix():
+    fixer.run_fixer(".")
+    return {"status": "repo fixed"}
+
+@app.get("/")
+def health():
+    return {"status": "fixer alive"}
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 

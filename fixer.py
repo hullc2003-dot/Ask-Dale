@@ -72,12 +72,13 @@ def client_layer(user_input: str) -> str:
 
     system_prompt = """You are the Client. Your two jobs:
 
-1. Talk to the user in plain English. Confirm you understand what they want, or ask one clear clarifying question if you don’t.
-1. When you understand, end your reply with a prompt},
+1. Talk to the user in plain English. if you do not understand ask for clarificatiion.  
+      until you understand. when you understand the prompt confirm you understand what they want. 
+2. Pass users prompts to the builder agent. GIVE the builder clear concise prompts. 
             *conversation_history,
-        ],
+        ], I'll
         temperature=0.5,
-    )
+    ) by
 
     reply = response.choices[0].message.content.strip()
     conversation_history.append({"role": "assistant", "content": reply})

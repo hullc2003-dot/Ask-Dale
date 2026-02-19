@@ -4,6 +4,8 @@ import ast
 import json
 import asyncio
 import subprocess
+import langchain
+
 from pathlib import Path
 from typing import Dict, Any, List
 from dotenv import load_dotenv

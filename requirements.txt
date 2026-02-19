@@ -10,5 +10,4 @@ langchain-core
 langchain-community 
 langchain-groq 
 langgraph
-langchain.agents
-langchain.prompts
+

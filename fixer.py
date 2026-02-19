@@ -206,8 +206,8 @@ app = FastAPI()
 class ChatRequest(BaseModel):
     input: str
 
-@app.get("/")
-def health(/):
+@app.get("/health")
+def health():
     return {"status": "alive"}
 
 @app.post("/chat")

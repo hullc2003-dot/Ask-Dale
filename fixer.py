@@ -51,7 +51,7 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request:"reply")
+async def chat_endpoint("reply":"HELLO")
     output = handle_prompt(request.input)
     return {"output": output} 
 

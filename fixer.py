@@ -1,13 +1,14 @@
 import os
+import sys
 import ast
 import json
 import asyncio
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List
-
+from dotenv import load_dotenv
 from groq import Groq
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 

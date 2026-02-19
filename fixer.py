@@ -12,6 +12,20 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated
+import operator
+
+# Define the state structure
+class AgentState(TypedDict):
+    messages: Annotated[list, operator.add]
+
+# Initialize the graph
+workflow = StateGraph(AgentState)
+
+# Add nodes and edges here...
+
+
 # =========================
 
 # Config

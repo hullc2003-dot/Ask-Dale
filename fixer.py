@@ -31,16 +31,19 @@ client = Groq(api_key=GROQ_API_KEY)
 
 app = FastAPI()
 app.add_middleware(
-CORSMiddleware,
-allow_origins=["*"],
-allow_credentials=True,
-allow_methods=["*"],
-allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # =========================
 # Endpoints
 # =========================
+
+class ChatRequest(BaseModel):
+    input: str
 
 @app.get("/")
 async def root():
@@ -51,26 +54,17 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request:ChatRequest):
+async def chat_endpoint(request: ChatRequest):
     output = handle_prompt(request.input)
-    return {"output": output} 
-
-
+    return {"output": output}
 
 conversation_history = []
 
 # =========================
-
 # Client Layer
-
-# Talks to you in plain English, confirms understanding,
-
-# translates your words into instructions for the Builder
-
 # =========================
 
 def client_layer(user_input: str) -> str:
-    # We pass the history so the LLM remembers what was said
     messages = [{"role": "system", "content": system_prompt}] + conversation_history
     messages.append({"role": "user", "content": user_input})
     
@@ -82,30 +76,20 @@ def client_layer(user_input: str) -> str:
     reply = response.choices[0].message.content.strip()
     conversation_history.append({"role": "assistant", "content": reply})
     return reply
-    *conversation_history,
-
 
 # =========================
-
-# Builder 
-
-# Receives plain English instructions from the Client,
-
-# does the actual work, returns a plain English result
-
+# Builder
 # =========================
+
 def builder_layer(task: str) -> str:
-    
-   Client = give builder prompts 
-    apply_fixes(builder_replys, "list of completed tasks") committed
+    Client = give builder prompts
+    apply_fixes(builder_replys, "list of completed tasks") 
     committed = git_commit_changes()
     status = "committed to git" if committed else "applied but git commit failed"
     return f"Scanned the repo, applied fixes, and {status}."
 
 # =========================
-
 # Core Agent Handler
-
 # =========================
 
 def handle_prompt(user_input: str) -> str:
@@ -119,9 +103,7 @@ def handle_prompt(user_input: str) -> str:
         result = builder_layer(task)
         return f"{user_facing}\n\nHere's what happened: {result}"
 
-    # Client is asking for clarification — return as-is
     return client_reply
-
 
 # =========================
 # Git Helper
@@ -131,10 +113,9 @@ def git_commit_changes(message: str = "Agent Auto-Fix: Resolved architecture gap
     try:
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", message], check=True)
-    return True
- except subprocess.CalledProcessError:
-    return False
-
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 # =========================
 # Entrypoint

@@ -73,14 +73,7 @@ def client_layer(user_input: str) -> str:
     system_prompt = """You are the Client. Your two jobs:
 
 1. Talk to the user in plain English. Confirm you understand what they want, or ask one clear clarifying question if you don’t.
-1. When you understand, end your reply with a line that starts exactly with:
-   BUILDER_TASK: <plain English instructions for the Builder>
-
-The Builder 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
+1. When you understand, end your reply with a prompt},
             *conversation_history,
         ],
         temperature=0.5,
@@ -102,19 +95,8 @@ The Builder
 
 def builder_layer(task: str) -> str:
     task_lower = task.lower()
-
-    if "status" in task_lower or "blueprint" in task_lower:
-        try:
-            import blueprint
-            report = blueprint.full_diff()
-            pct = report["blueprint"]["completion_pct"]
-            return f"Blueprint is {pct}% complete."
-        except Exception as e:
-            return f"Tried to check the blueprint but hit an error: {e}"
-
-    # Default: run the repo fixer
-    repo_map = build_repo_map_for_llm(".")
-    ai_response = ask_groq_to_fix(repo_map)
+  
+    ai_response = ask_groq_to_fix(repo)
     apply_fixes(ai_response, ".")
     committed = git_commit_changes()
     status = "committed to git" if committed else "applied but git commit failed"
@@ -141,9 +123,6 @@ def handle_prompt(user_input: str) -> str:
     return client_reply
 
 
-
-
-
 # =========================
 # Git Helper
 # =========================
@@ -155,8 +134,6 @@ def git_commit_changes(message: str = "Agent Auto-Fix: Resolved architecture gap
         return True
     except subprocess.CalledProcessError:
         return False
-
-
 
 
 # =========================

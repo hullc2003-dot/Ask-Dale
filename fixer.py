@@ -19,9 +19,14 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
-    output = handle_prompt(request.input)
-    return {"output": output}
+def handle_prompt(input_text: str) -> str:
+    completion = client.chat.completions.create(
+        model="mixtral-8x7b-32768",
+        messages=[{"role": "user", "content": input_text}],
+        temperature=0.7,
+        max_tokens=1024
+    )
+    return completion.choices[
 
 
 if __name__ == "__main__":

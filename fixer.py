@@ -215,6 +215,7 @@ return {
 
 @app.get("/health")
 async def health():
+    return {"status": "alive"}
     """
     Status polling for the dashboard indicator light.
     """
@@ -278,13 +279,6 @@ async def chat(req: ChatRequest):str:
 # =========================
 
 app = FastAPI()
-
-class ChatRequest(BaseModel):
-    input: str
-
-@app.get("/health")  # FIX: was `def health(/):` — invalid syntax; also renamed to /health
-def health():
-    return {"status": "alive"}
 
 @app.post("/chat")
 def chat_endpoint(request: ChatRequest):

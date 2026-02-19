@@ -209,7 +209,7 @@ async def root():
     return {"status": "online", "agent": "fixer"}
 
 @app.get("/health")
-async def health():
+def health():
     return {"status": "alive"}
 
 @app.post("/chat")

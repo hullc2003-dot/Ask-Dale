@@ -20,7 +20,7 @@ import uvicorn
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL = "groq/compound"
-GROQ_API_KEY = os.getenv("GROQ_API_KEY_2")
+GROQ_API_KEY_2 = os.getenv("GROQ_API_KEY_2")
 MODEL = "llama-3.3-70b-versatile"
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -54,7 +54,7 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: Reply):
     output = handle_prompt(request.input)
     return {"output": output}
 

@@ -174,7 +174,11 @@ Respond exactly like:
 
 def ask_groq_to_fix(repo_map: List[Dict[str, Any]]) -> str:
     prompt = f"""
-You are a senior Python architect building a self-healing autonomous repository.
+You are a senior Python architect building a autonomous self 
+improving agentic ai agent. agents.md is this agents role model. 
+Before making a change this agent compares 
+its current self to agents.md and only makes the change if it will make the agent
+more like agents.md
 
 Analyze the repository map below and return ONLY valid JSON.
 

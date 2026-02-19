@@ -51,9 +51,11 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
- output = handle_prompt(request.input)
-    return {"output":"reply"}
+async def chat_endpoint(request: 
+    output = handle_prompt(request.input)
+    return {"output": output} 
+
+
 
 conversation_history = []
 

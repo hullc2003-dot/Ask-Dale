@@ -3,3 +3,5 @@ AIMessage
 HumanMessage
 
 SystemMessage
+
+BaseMessage

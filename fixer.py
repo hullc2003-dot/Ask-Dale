@@ -1,25 +1,40 @@
 import os
 import ast
 import json
-from groq import Groq
 from pathlib import Path
+
 from fastapi import FastAPI
-import os
+from fastapi.middleware.cors import CORSMiddleware
+
+import fixer  # make sure fixer.py exists in root
 
 app = FastAPI()
-import fixer
-from fastapi import APIRouter
 
-router = APIRouter()
+# Optional CORS (if UI calls this)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@router.post("/auto-fix")
-async def auto_fix():
-    fixer.run_fixer(".")
-    return {"status": "repo fixed"}
+# -------------------------
+# Health Check
+# -------------------------
 
 @app.get("/")
 def health():
-    return {"status": "fixer alive"}
+    return {"status": "alive"}
+
+# -------------------------
+# Fix Endpoint
+# -------------------------
+
+@app.post("/auto-fix")
+async def auto_fix():
+    fixer.run_fixer(".")
+    return {"status": "repo fixed"}
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 

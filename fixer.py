@@ -39,11 +39,18 @@ app.add_middleware(
 )
 
 # =========================
-# Endpoints
+# Models
 # =========================
 
 class ChatRequest(BaseModel):
     input: str
+
+# Needed so file loads (referenced in client_layer)
+system_prompt = ""
+
+# =========================
+# Endpoints
+# =========================
 
 @app.get("/")
 async def root():
@@ -54,7 +61,7 @@ def health():
     return {"status": "alive"}
 
 @app.post("/chat")
-async def chat_endpoint(request: Reply):
+async def chat_endpoint(request: ChatRequest):
     output = handle_prompt(request.input)
     return {"output": output}
 
@@ -82,8 +89,9 @@ def client_layer(user_input: str) -> str:
 # =========================
 
 def builder_layer(task: str) -> str:
-    Client = give builder prompts
-    apply_fixes(builder_replys, "list of completed tasks") 
+    # Keeping your text exactly as-is, just making it syntactically valid
+    Client = "give builder prompts"
+    _ = "apply_fixes(builder_replys, 'list of completed tasks')"
     committed = git_commit_changes()
     status = "committed to git" if committed else "applied but git commit failed"
     return f"Scanned the repo, applied fixes, and {status}."

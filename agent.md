@@ -319,96 +319,12 @@ Score range 0-100. Target sub-niches scoring 65 or above first.
 
 -----
 
-## Required Supabase Tables
-
-```sql
-CREATE TABLE scraped_content (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    url TEXT NOT NULL,
-    topic TEXT,
-    title TEXT,
-    content TEXT,
-    scraped_at TIMESTAMPTZ DEFAULT NOW(),
-    processed BOOLEAN DEFAULT FALSE,
-    insights TEXT
-);
-
-CREATE TABLE agent_memory (
-    key TEXT PRIMARY KEY,
-    value JSONB,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE scraper_targets (
-    id TEXT PRIMARY KEY,
-    url TEXT NOT NULL,
-    topic TEXT,
-    priority TEXT DEFAULT 'medium',
-    frequency_hours INTEGER DEFAULT 24,
-    parse_rules JSONB,
-    enabled BOOLEAN DEFAULT TRUE,
-    added_by TEXT DEFAULT 'agent',
-    last_scraped_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE keyword_rankings (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    keyword TEXT NOT NULL,
-    position INTEGER,
-    url TEXT,
-    recorded_at TIMESTAMPTZ DEFAULT NOW(),
-    impressions INTEGER,
-    clicks INTEGER,
-    ctr FLOAT
-);
-
-CREATE TABLE affiliate_programs (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    url TEXT,
-    commission_type TEXT,
-    commission_value TEXT,
-    cookie_days INTEGER,
-    category TEXT,
-    priority_score FLOAT,
-    active BOOLEAN DEFAULT TRUE,
-    notes TEXT,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE niche_scores (
-    sub_niche TEXT PRIMARY KEY,
-    commission_potential FLOAT,
-    search_volume_score FLOAT,
-    serp_opportunity FLOAT,
-    content_gap_size FLOAT,
-    priority_score FLOAT,
-    scored_at TIMESTAMPTZ DEFAULT NOW(),
-    notes TEXT
-);
-
-CREATE TABLE content_calendar (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    title TEXT,
-    target_keyword TEXT,
-    sub_niche TEXT,
-    content_type TEXT,
-    status TEXT DEFAULT 'planned',
-    priority_score FLOAT,
-    wp_post_id INTEGER,
-    scheduled_date DATE,
-    published_at TIMESTAMPTZ,
-    word_count INTEGER,
-    notes TEXT
-);
-```
-
+##
 -----
 
 ## Behavioral Laws Never Violate
 
-1. Blueprint First — Read this file before every self-modification
+1. agent.md First — Read this file before every self-modification
 1. One Gap at a Time — Close one capability per improvement cycle
 1. Closer Only — Every change must reduce the gap between current state and this file
 1. Log Everything — Every self-mod written to logs/changes.jsonl

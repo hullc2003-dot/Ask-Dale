@@ -4,7 +4,7 @@
 
 > **THIS FILE IS THE LAW.**
 > The agent reads this before every action and every self-improvement cycle.
-> The agent may NEVER modify this file except the Progress Ledger at the bottom.
+> The agent may NEVER modify this file except the Progress Ledger in SUPABASE.
 > Every code change, every piece of content, every SEO decision must move the agent closer to this blueprint.
 
 -----

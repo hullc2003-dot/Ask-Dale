@@ -40,11 +40,11 @@ def git_commit_changes(message="Agent Auto-Fix: Resolved blueprint gaps"):
         subprocess.run(["git", "add", "."], check=True)
         # Commit with a descriptive message
         subprocess.run(["git", "commit", "-m", message], check=True)
-        print(f"📦 Git: Changes committed successfully.")
+        print(f"Git: Changes committed successfully.")
         return True
     except subprocess.CalledProcessError as e:
         # This usually happens if there are no changes to commit
-        print(f"⚠️ Git: Nothing to commit or git error: {e}")
+        print(f"Git: Nothing to commit or git error: {e}")
         return False
 
 # -------------------------
@@ -78,7 +78,7 @@ async def chat_endpoint(request: ChatRequest):
             
             if "apply" in user_input:
                 run_fixer(".")
-                return {"output": "✅ Fixes applied and committed to Git history."}
+                return {"output": "Fixes applied and committed to Git history."}
                 
             return {
                 "output": f"🔍 Status: {report['blueprint']['completion_pct']}% complete. "
@@ -124,12 +124,12 @@ def extract_file_data(file_path: Path):
     return {"path": str(file_path), "imports": imports, "definitions": definitions, "raw": source, "parse_error": False}
 
 def ask_groq_to_fix(repo_map):
-    prompt = f"You are a senior Python architect... [truncated for brevity]\n{json.dumps(repo_map, indent=2)}"
+    prompt = f"You are a senior Python architect building a autonomous agentic ai agent... [truncated for brevity]\n{json.dumps(repo_map, indent=2)}"
     response = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.1)
     return response.choices[0].message.content
 
 def apply_fixes(response_json):
-    try:
+    try: it
         data = json.loads(response_json)
     except Exception:
         return

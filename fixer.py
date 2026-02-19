@@ -201,12 +201,21 @@ def run_repo_fixer(repo_path: str = ".") -> str:
 
 # =========================
 
-# Public Entry Point
+# endpoints
 
 # =========================
-
-def handle_prompt(user_input: str) -> str:
-    """
+        @app.get("/")
+    async def root():
+        """Basic ui verification."""
+    return {
+        "status": "online",
+        "mode": "Live",
+        "agent": "fixer",
+    }
+       @app.get("/health")
+   async def health():
+       def handle_prompt(user_input: str) -> str:
+        """
     Main entrypoint for natural language prompts.
     """
     intent = classify_intent(user_input)

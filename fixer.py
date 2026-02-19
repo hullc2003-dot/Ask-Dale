@@ -7,7 +7,7 @@ from typing import Dict, Any, List, TypedDict, Annotated
 import operator
 
 from dotenv import load_dotenv
-from groq import Groq
+from groq import groq/compound
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

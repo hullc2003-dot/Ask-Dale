@@ -12,7 +12,6 @@ import operator
 
 # LangChain and LangGraph imports
 from langchain_groq import ChatGroq
-from langchain.agents import AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory

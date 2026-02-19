@@ -207,7 +207,7 @@ class ChatRequest(BaseModel):
     input: str
 
 @app.get("/")
-def health():
+def health(/):
     return {"status": "alive"}
 
 @app.post("/chat")

@@ -9,4 +9,4 @@ langchain
 langchain-core 
 langchain-community 
 langchain-groq 
-langgraph-requests
+langgraph

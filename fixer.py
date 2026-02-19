@@ -12,7 +12,7 @@ import operator
 
 # LangChain and LangGraph imports
 from langchain_groq import ChatGroq
-from langchain.agents import create_react_agent, AgentExecutor
+from langchain.agents import create_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory
@@ -158,23 +158,23 @@ class AgentState(TypedDict):
     next: str
 
 # Define agents
-def create_agent(llm, tools, system_prompt):
+def create_agent_fn(llm, tools, system_prompt):
     prompt = PromptTemplate.from_template(system_prompt)
-    agent = create_react_agent(llm, tools, prompt)
+    agent = create_agent(llm, tools, prompt)
     executor = AgentExecutor(agent=agent, tools=tools, handle_parsing_errors=True)
     return executor
 
 planner_prompt = """You are a planner. For the task: {task}, create a detailed plan."""
-planner = create_agent(llm, [], planner_prompt)  # No tools for planner
+planner = create_agent_fn(llm, [], planner_prompt)  # No tools for planner
 
 researcher_prompt = """You are a researcher. Research info for the plan."""
-researcher = create_agent(llm, [search, browse_url], researcher_prompt)
+researcher = create_agent_fn(llm, [search, browse_url], researcher_prompt)
 
 coder_prompt = """You are a coder. Implement changes based on plan and research."""
-coder = create_agent(llm, [read_file, write_file, append_file, list_files, python_repl], coder_prompt)
+coder = create_agent_fn(llm, [read_file, write_file, append_file, list_files, python_repl], coder_prompt)
 
 tester_prompt = """You are a tester. Test the code changes."""
-tester = create_agent(llm, [run_shell, python_repl], tester_prompt)
+tester = create_agent_fn(llm, [run_shell, python_repl], tester_prompt)
 
 # Nodes
 def planner_node(state):

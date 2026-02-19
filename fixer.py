@@ -9,28 +9,6 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 
-app = FastAPI()
-
-class ChatRequest(BaseModel):
-    input: str
-
-@app.get("/")
-def health():
-    return {"status": "alive"}
-
-@app.post("/chat")
-def handle_prompt(input_text: str) -> str:
-    completion = client.chat.completions.create(
-        model="mixtral-8x7b-32768",
-        messages=[{"role": "user", "content": input_text}],
-        temperature=0.7,
-        max_tokens=1024
-    )
-    return completion.choices[
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 # =========================
 # Config
 # =========================
@@ -42,7 +20,6 @@ if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not set")
 
 client = Groq(api_key=GROQ_API_KEY)
-
 
 # =========================
 # Git Helper
@@ -56,14 +33,12 @@ def git_commit_changes(message="Agent Auto-Fix: Resolved architecture gaps"):
     except subprocess.CalledProcessError:
         return False
 
-
 # =========================
 # Repo Scanning
 # =========================
 
 def get_python_files(repo_path: str) -> List[Path]:
     return list(Path(repo_path).rglob("*.py"))
-
 
 def extract_file_data(file_path: Path) -> Dict[str, Any]:
     with open(file_path, "r", encoding="utf-8") as f:
@@ -100,7 +75,6 @@ def extract_file_data(file_path: Path) -> Dict[str, Any]:
         "parse_error": False,
     }
 
-
 # =========================
 # Intent Classification
 # =========================
@@ -134,7 +108,6 @@ Respond exactly like:
     except Exception:
         return {"action": "chat"}
 
-
 # =========================
 # AI Fix Logic
 # =========================
@@ -167,7 +140,6 @@ Repository:
 
     return response.choices[0].message.content
 
-
 def apply_fixes(response_json: str):
     try:
         data = json.loads(response_json)
@@ -181,7 +153,6 @@ def apply_fixes(response_json: str):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(new_content)
 
-
 def run_repo_fixer(repo_path: str = ".") -> str:
     files = get_python_files(repo_path)
     repo_map = [extract_file_data(f) for f in files]
@@ -191,7 +162,6 @@ def run_repo_fixer(repo_path: str = ".") -> str:
     git_commit_changes()
 
     return "Repository scanned, fixed, and committed."
-
 
 # =========================
 # Public Entry Point
@@ -226,3 +196,24 @@ def handle_prompt(user_input: str) -> str:
             temperature=0.2,
         )
         return response.choices[0].message.content
+
+# =========================
+# FastAPI App
+# =========================
+
+app = FastAPI()
+
+class ChatRequest(BaseModel):
+    input: str
+
+@app.get("/")
+def health():
+    return {"status": "alive"}
+
+@app.post("/chat")
+def chat_endpoint(request: ChatRequest):
+    output = handle_prompt(request.input)
+    return {"output": output}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -68,15 +68,19 @@ conversation_history = []
 # =========================
 
 def client_layer(user_input: str) -> str:
-    conversation_history.append({"role": "user", "content": user_input})
-reply = response.choices[0].message.content.strip()
+    # We pass the history so the LLM remembers what was said
+    messages = [{"role": "system", "content": system_prompt}] + conversation_history
+    messages.append({"role": "user", "content": user_input})
+    
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages
+    )
+    
+    reply = response.choices[0].message.content.strip()
     conversation_history.append({"role": "assistant", "content": reply})
-return reply
+    return reply
 
- system_prompt = """You are the Client. Your two jobs:
-1. Talk to the user in plain English. if you do not understand ask for clarificatiion.  
-      until you understand. when you understand the prompt confirm you understand what they want. 
-2. Pass users prompts to the builder agent. GIVE the builder clear concise prompts. 
             *conversation_history,
             
 # =========================

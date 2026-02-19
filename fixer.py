@@ -4,9 +4,28 @@ import json
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List
-
 from groq import Groq
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
 
+app = FastAPI()
+
+class ChatRequest(BaseModel):
+    input: str
+
+@app.get("/")
+def health():
+    return {"status": "alive"}
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    output = handle_prompt(request.input)
+    return {"output": output}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 # =========================
 # Config
 # =========================

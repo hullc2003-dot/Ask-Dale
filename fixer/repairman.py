@@ -11,7 +11,7 @@ import uvicorn
 import operator
 
 # LangChain and LangGraph imports
-from langchain_groq import Client
+from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
 from langchain.memory import ConversationBufferMemory

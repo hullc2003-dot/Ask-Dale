@@ -37,7 +37,7 @@ class ConversationTurn:
     created_at: datetime
 
 
-class ConversationMemory:
+class ConversationBufferMemory:
     def __init__(self, max_turns: int = 5):
         self.max_turns: int = max(1, int(max_turns))
 

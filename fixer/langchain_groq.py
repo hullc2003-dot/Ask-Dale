@@ -1,7 +1,7 @@
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 
-# Initialize the Groq model
+
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",  # or "mixtral-8x7b-32768", "gemma2-9b-it"
     temperature=0.7,

@@ -1,8 +1,6 @@
-PromptTemplate
 from __future__ import annotations
 
 from .prompts_ids import PromptId
-from .prompt_template import PromptTemplate
 
 @dataclass(frozen=True)
 class PromptTemplate:
